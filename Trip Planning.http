@@ -1,0 +1,415 @@
+### Navio Trip Planning API
+### Run Configuration Server (:8888), Discovery Server (:8761),
+### Trip Planning Service (:8082), and API Gateway (:8080) first.
+
+@gatewayUrl = http://localhost:8080
+@userId = 00000000-0000-0000-0000-000000000001
+@otherUserId = 00000000-0000-0000-0000-000000000002
+
+### 1. Create a trip through the gateway
+POST {{gatewayUrl}}/v1/trips
+X-User-Id: {{userId}}
+Content-Type: application/json
+Accept: application/json
+
+{
+  "displayName": "Bangkok planner autosave test",
+  "startDate": "2026-09-01",
+  "endDate": "2026-09-04",
+  "destinationId": "google:bangkok-thailand",
+  "destinationName": "Bangkok, Thailand",
+  "destinationLat": 13.7563,
+  "destinationLng": 100.5018,
+  "destinationCountry": "Thailand"
+}
+
+> {%
+  client.test("Trip is created", function () {
+    client.assert(response.status === 201, "Expected HTTP 201");
+    client.assert(Boolean(response.body.id), "Response must contain a trip id");
+  });
+  client.global.set("tripId", response.body.id);
+%}
+
+### 2. Read the newly created trip
+GET {{gatewayUrl}}/v1/trips/{{tripId}}
+X-User-Id: {{userId}}
+Accept: application/json
+
+> {%
+  client.test("Trip is readable by its owner", function () {
+    client.assert(response.status === 200, "Expected HTTP 200");
+    client.assert(response.body.id === client.global.get("tripId"), "Wrong trip returned");
+  });
+%}
+
+### 3. Initial planner is empty
+GET {{gatewayUrl}}/v1/trips/{{tripId}}/planner
+X-User-Id: {{userId}}
+Accept: application/json
+
+> {%
+  client.test("New planner has no blocks", function () {
+    client.assert(response.status === 200, "Expected HTTP 200");
+    client.assert(Array.isArray(response.body.blocks), "blocks must be an array");
+    client.assert(response.body.blocks.length === 0, "New planner should be empty");
+  });
+  client.global.set("plannerVersion", response.body.version);
+%}
+
+### 4. Save every frontend block/item shape in one atomic snapshot
+PUT {{gatewayUrl}}/v1/trips/{{tripId}}/planner
+X-User-Id: {{userId}}
+Content-Type: application/json
+Accept: application/json
+
+{
+  "version": {{plannerVersion}},
+  "blocks": [
+    {
+      "id": "block-list-1",
+      "kind": "list",
+      "title": "Things to prepare",
+      "date": "2026-09-01",
+      "colorId": "amber",
+      "items": [
+        {
+          "id": "note-1",
+          "type": "note",
+          "content": "Bring a reusable water bottle."
+        },
+        {
+          "id": "checklist-1",
+          "type": "checklist",
+          "title": "Packing list",
+          "items": [
+            {
+              "id": "checklist-item-1",
+              "label": "Passport",
+              "checked": false
+            },
+            {
+              "id": "checklist-item-2",
+              "label": "Charging cable",
+              "checked": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "block-day-1",
+      "kind": "itinerary",
+      "title": "Tue, Sep 1, 2026",
+      "date": "2026-09-01",
+      "colorId": "teal",
+      "items": [
+        {
+          "id": "place-1",
+          "type": "place",
+          "placeId": "google:siriraj-hospital",
+          "name": "Siriraj Piyamaharajkarun Hospital",
+          "description": "Hospital stop",
+          "address": "2 Thanon Wang Lang, Bangkok Noi, Bangkok, Thailand",
+          "lat": 13.7596,
+          "lng": 100.4854,
+          "rating": 4.4,
+          "reviewCount": 2431,
+          "imageUrl": "https://example.test/siriraj.jpg",
+          "notes": "Use the main entrance.",
+          "isVisited": false,
+          "time": "09:00",
+          "timeEnd": "10:30",
+          "cost": 250.0
+        },
+        {
+          "id": "place-ev-1",
+          "type": "place",
+          "placeId": "ev-charger:noodee-1",
+          "name": "Noodee Charging Station",
+          "description": "EV charging station",
+          "address": "78 Prajatipatai Road, Bangkok, Thailand",
+          "lat": 13.7622,
+          "lng": 100.5012,
+          "isVisited": false,
+          "evCharger": {
+            "connectorTypes": ["CCS2", "TYPE2"],
+            "maxKw": 22.0,
+            "totalConnectors": 1,
+            "availableConnectors": 1,
+            "priceText": "Price not listed",
+            "openingHoursSummary": "Hours not listed",
+            "estimatedChargeMinutes": 90,
+            "operatorName": "Noodee"
+          }
+        }
+      ]
+    }
+  ]
+}
+
+> {%
+  client.test("Planner save returns a compact acknowledgement", function () {
+    client.assert(response.status === 200, "Expected HTTP 200");
+    client.assert(typeof response.body.version === "number", "Expected the next planner version");
+    client.assert(typeof response.body.savedAt === "string", "Expected the save timestamp");
+    client.assert(response.body.blocks === undefined, "Save response should not repeat all blocks");
+  });
+  client.global.set("plannerVersion", response.body.version);
+%}
+
+### 4a. Reload to verify the complete initial snapshot
+GET {{gatewayUrl}}/v1/trips/{{tripId}}/planner
+X-User-Id: {{userId}}
+Accept: application/json
+
+> {%
+  client.test("Full planner snapshot is persisted", function () {
+    client.assert(response.status === 200, "Expected HTTP 200");
+    client.assert(response.body.blocks.length === 2, "Expected two blocks");
+    client.assert(response.body.blocks[0].items.length === 2, "Expected note and checklist");
+    client.assert(response.body.blocks[1].items[1].evCharger.maxKw === 22, "EV snapshot was not saved");
+  });
+%}
+
+### 5. Rename, tick, edit, reorder, and update place fields (the autosave request)
+PUT {{gatewayUrl}}/v1/trips/{{tripId}}/planner
+X-User-Id: {{userId}}
+Content-Type: application/json
+Accept: application/json
+
+{
+  "version": {{plannerVersion}},
+  "blocks": [
+    {
+      "id": "block-day-1",
+      "kind": "itinerary",
+      "title": "Bangkok arrival day",
+      "date": "2026-09-01",
+      "colorId": "cyan",
+      "items": [
+        {
+          "id": "place-ev-1",
+          "type": "place",
+          "placeId": "ev-charger:noodee-1",
+          "name": "Noodee Charging Station",
+          "description": "EV charging station",
+          "address": "78 Prajatipatai Road, Bangkok, Thailand",
+          "lat": 13.7622,
+          "lng": 100.5012,
+          "isVisited": true,
+          "evCharger": {
+            "connectorTypes": ["CCS2", "TYPE2"],
+            "maxKw": 22.0,
+            "totalConnectors": 1,
+            "availableConnectors": 1,
+            "priceText": "Price not listed",
+            "openingHoursSummary": "Hours not listed",
+            "estimatedChargeMinutes": 90,
+            "operatorName": "Noodee"
+          }
+        },
+        {
+          "id": "place-1",
+          "type": "place",
+          "placeId": "google:siriraj-hospital",
+          "name": "Siriraj Piyamaharajkarun Hospital",
+          "description": "Hospital stop",
+          "address": "2 Thanon Wang Lang, Bangkok Noi, Bangkok, Thailand",
+          "lat": 13.7596,
+          "lng": 100.4854,
+          "rating": 4.4,
+          "reviewCount": 2431,
+          "imageUrl": "https://example.test/siriraj.jpg",
+          "notes": "Updated notes are persisted immediately.",
+          "isVisited": true,
+          "time": "09:15",
+          "timeEnd": "10:45",
+          "cost": 300.0
+        }
+      ]
+    },
+    {
+      "id": "block-list-1",
+      "kind": "list",
+      "title": "Final preparation",
+      "date": "2026-09-01",
+      "colorId": "amber",
+      "items": [
+        {
+          "id": "checklist-1",
+          "type": "checklist",
+          "title": "Updated packing list",
+          "items": [
+            {
+              "id": "checklist-item-1",
+              "label": "Passport and visa",
+              "checked": true
+            },
+            {
+              "id": "checklist-item-2",
+              "label": "Charging cable",
+              "checked": false
+            }
+          ]
+        },
+        {
+          "id": "note-1",
+          "type": "note",
+          "content": "Updated note text."
+        }
+      ]
+    }
+  ]
+}
+
+> {%
+  client.test("Edited planner save is acknowledged", function () {
+    client.assert(response.status === 200, "Expected HTTP 200");
+    client.assert(typeof response.body.version === "number", "Expected the next planner version");
+    client.assert(response.body.blocks === undefined, "Save response should remain compact");
+  });
+  client.global.set("plannerVersion", response.body.version);
+%}
+
+### 5a. Reload to verify edits and ordering
+GET {{gatewayUrl}}/v1/trips/{{tripId}}/planner
+X-User-Id: {{userId}}
+Accept: application/json
+
+> {%
+  client.test("All edits and ordering are persisted", function () {
+    client.assert(response.status === 200, "Expected HTTP 200");
+    client.assert(response.body.blocks[0].id === "block-day-1", "Block reorder failed");
+    client.assert(response.body.blocks[0].items[0].id === "place-ev-1", "Item reorder failed");
+    client.assert(response.body.blocks[1].title === "Final preparation", "Rename failed");
+    client.assert(response.body.blocks[1].items[0].title === "Updated packing list", "Checklist rename failed");
+    client.assert(response.body.blocks[1].items[0].items[0].checked === true, "Checklist tick failed");
+    client.assert(response.body.blocks[1].items[0].items[0].label === "Passport and visa", "Checklist label update failed");
+  });
+%}
+
+### 6. Delete a checklist row, note, place, and entire itinerary block by omission
+PUT {{gatewayUrl}}/v1/trips/{{tripId}}/planner
+X-User-Id: {{userId}}
+Content-Type: application/json
+Accept: application/json
+
+{
+  "version": {{plannerVersion}},
+  "blocks": [
+    {
+      "id": "block-list-1",
+      "kind": "list",
+      "title": "Final preparation",
+      "date": "2026-09-01",
+      "colorId": "amber",
+      "items": [
+        {
+          "id": "checklist-1",
+          "type": "checklist",
+          "title": "Updated packing list",
+          "items": [
+            {
+              "id": "checklist-item-1",
+              "label": "Passport and visa",
+              "checked": true
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+
+> {%
+  client.test("Deletion snapshot is acknowledged", function () {
+    client.assert(response.status === 200, "Expected HTTP 200");
+    client.assert(typeof response.body.version === "number", "Expected the next planner version");
+    client.assert(response.body.blocks === undefined, "Save response should remain compact");
+  });
+  client.global.set("plannerVersion", response.body.version);
+%}
+
+### 7. Reload to prove the last snapshot is in the backend
+GET {{gatewayUrl}}/v1/trips/{{tripId}}/planner
+X-User-Id: {{userId}}
+Accept: application/json
+
+> {%
+  client.test("Reload returns persisted state", function () {
+    client.assert(response.status === 200, "Expected HTTP 200");
+    client.assert(response.body.blocks[0].title === "Final preparation", "Latest state was not persisted");
+    client.assert(response.body.blocks.length === 1, "Block delete failed");
+    client.assert(response.body.blocks[0].items.length === 1, "Item delete failed");
+    client.assert(response.body.blocks[0].items[0].items.length === 1, "Checklist row delete failed");
+  });
+%}
+
+### 8. A different user cannot access the planner
+GET {{gatewayUrl}}/v1/trips/{{tripId}}/planner
+X-User-Id: {{otherUserId}}
+Accept: application/json
+
+> {%
+  client.test("Planner ownership is enforced", function () {
+    client.assert(response.status === 404, "Expected HTTP 404");
+  });
+%}
+
+### 9. Invalid duplicate client IDs are rejected
+PUT {{gatewayUrl}}/v1/trips/{{tripId}}/planner
+X-User-Id: {{userId}}
+Content-Type: application/json
+Accept: application/json
+
+{
+  "version": {{plannerVersion}},
+  "blocks": [
+    {
+      "id": "duplicate-block",
+      "kind": "list",
+      "title": "First",
+      "date": "2026-09-01",
+      "colorId": "teal",
+      "items": []
+    },
+    {
+      "id": "duplicate-block",
+      "kind": "list",
+      "title": "Second",
+      "date": "2026-09-02",
+      "colorId": "blue",
+      "items": []
+    }
+  ]
+}
+
+> {%
+  client.test("Invalid snapshots fail without a partial save", function () {
+    client.assert(response.status === 400, "Expected HTTP 400");
+  });
+%}
+
+### 10. Update trip metadata
+PUT {{gatewayUrl}}/v1/trips/{{tripId}}
+X-User-Id: {{userId}}
+Content-Type: application/json
+Accept: application/json
+
+{
+  "displayName": "Bangkok production planner test",
+  "visibility": "PRIVATE"
+}
+
+### 11. Delete the test trip (cleanup)
+DELETE {{gatewayUrl}}/v1/trips/{{tripId}}
+X-User-Id: {{userId}}
+
+> {%
+  client.test("Test trip is deleted", function () {
+    client.assert(response.status === 204, "Expected HTTP 204");
+  });
+  client.global.clear("tripId");
+  client.global.clear("plannerVersion");
+%}

@@ -1,0 +1,128 @@
+package com.navio.tripplanningservice.service;
+
+import com.navio.tripplanningservice.dto.CreateTripRequest;
+import com.navio.tripplanningservice.dto.TripResponse;
+import com.navio.tripplanningservice.dto.UpdateTripRequest;
+import com.navio.tripplanningservice.model.Trip;
+import com.navio.tripplanningservice.model.TripVisibility;
+import com.navio.tripplanningservice.repository.TripRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+@Transactional(readOnly = true)
+public class TripService {
+
+    private final TripRepository tripRepository;
+
+    @Transactional
+    public TripResponse createTrip(UUID userId, CreateTripRequest request) {
+        Trip trip = Trip.builder()
+                .userId(userId)
+                .displayName(request.getDisplayName())
+                .startDate(request.getStartDate())
+                .endDate(request.getEndDate())
+                .destinationId(request.getDestinationId())
+                .destinationName(request.getDestinationName())
+                .destinationLat(request.getDestinationLat())
+                .destinationLng(request.getDestinationLng())
+                .destinationCountry(request.getDestinationCountry())
+                .visibility(TripVisibility.PRIVATE)
+                .build();
+
+        Trip savedTrip = tripRepository.save(trip);
+        return mapToResponse(savedTrip);
+    }
+
+    public TripResponse getTripById(UUID tripId, UUID userId) {
+        Trip trip = tripRepository.findByIdAndUserId(tripId, userId)
+                .orElseThrow(() -> new TripNotFoundException(tripId));
+        return mapToResponse(trip);
+    }
+
+    public Page<TripResponse> getUserTrips(UUID userId, Pageable pageable) {
+        Page<Trip> trips = tripRepository.findByUserId(userId, pageable);
+        return new PageImpl<>(
+                trips.getContent().stream()
+                        .map(this::mapToResponse)
+                        .collect(Collectors.toList()),
+                pageable,
+                trips.getTotalElements()
+        );
+    }
+
+    @Transactional
+    public TripResponse updateTrip(UUID tripId, UUID userId, UpdateTripRequest request) {
+        Trip trip = tripRepository.findByIdAndUserId(tripId, userId)
+                .orElseThrow(() -> new TripNotFoundException(tripId));
+
+        if (request.getDisplayName() != null) {
+            trip.setDisplayName(request.getDisplayName());
+        }
+        if (request.getStartDate() != null) {
+            trip.setStartDate(request.getStartDate());
+        }
+        if (request.getEndDate() != null) {
+            trip.setEndDate(request.getEndDate());
+        }
+        if (request.getDestinationId() != null) {
+            trip.setDestinationId(request.getDestinationId());
+        }
+        if (request.getDestinationName() != null) {
+            trip.setDestinationName(request.getDestinationName());
+        }
+        if (request.getDestinationLat() != null) {
+            trip.setDestinationLat(request.getDestinationLat());
+        }
+        if (request.getDestinationLng() != null) {
+            trip.setDestinationLng(request.getDestinationLng());
+        }
+        if (request.getDestinationCountry() != null) {
+            trip.setDestinationCountry(request.getDestinationCountry());
+        }
+        if (request.getVisibility() != null) {
+            trip.setVisibility(TripVisibility.valueOf(request.getVisibility()));
+        }
+
+        Trip updatedTrip = tripRepository.save(trip);
+        return mapToResponse(updatedTrip);
+    }
+
+    @Transactional
+    public void deleteTrip(UUID tripId, UUID userId) {
+        Trip trip = tripRepository.findByIdAndUserId(tripId, userId)
+                .orElseThrow(() -> new TripNotFoundException(tripId));
+        tripRepository.delete(trip);
+    }
+
+    private TripResponse mapToResponse(Trip trip) {
+        return TripResponse.builder()
+                .id(trip.getId())
+                .displayName(trip.getDisplayName())
+                .startDate(trip.getStartDate())
+                .endDate(trip.getEndDate())
+                .destinationId(trip.getDestinationId())
+                .destinationName(trip.getDestinationName())
+                .destinationLat(trip.getDestinationLat())
+                .destinationLng(trip.getDestinationLng())
+                .destinationCountry(trip.getDestinationCountry())
+                .visibility(trip.getVisibility().toString())
+                .createdAt(trip.getCreatedAt())
+                .updatedAt(trip.getUpdatedAt())
+                .build();
+    }
+
+    public static class TripNotFoundException extends RuntimeException {
+        public TripNotFoundException(UUID tripId) {
+            super("Trip not found: " + tripId);
+        }
+    }
+}
