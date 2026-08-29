@@ -3,6 +3,16 @@ spring:
     name: trip-planning-service
   config:
     import: configserver:http://localhost:8888
+  cache:
+    cache-names: currencyRates
+    caffeine:
+      spec: maximumSize=32,expireAfterWrite=12h,recordStats
+
+navio:
+  currency-provider:
+    base-url: https://api.frankfurter.dev
+  mobility:
+    base-url: ${MOBILITY_SERVICE_BASE_URL:http://localhost:8083}
 
 management:
   metrics:

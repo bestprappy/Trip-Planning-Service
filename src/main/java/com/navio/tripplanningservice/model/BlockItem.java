@@ -91,6 +91,8 @@ public class BlockItem {
     private Integer evTotalConnectors;
     private Integer evAvailableConnectors;
     private String evOperatorName;
+    private String evSelectionSource;
+    private Boolean evLocked;
 
     // ============ CHECKLIST ITEM FIELDS ============
     private Boolean completed;        // Checklist completion status
@@ -122,6 +124,9 @@ public class BlockItem {
         }
         if (isCharged == null) {
             isCharged = false;
+        }
+        if (evLocked == null) {
+            evLocked = false;
         }
         if (visited == null) {
             visited = false;

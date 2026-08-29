@@ -4,7 +4,11 @@ import com.navio.tripplanningservice.service.BlockItemService.BlockItemNotFoundE
 import com.navio.tripplanningservice.service.ListBlockService.ListBlockNotFoundException;
 import com.navio.tripplanningservice.service.TripService.TripNotFoundException;
 import com.navio.tripplanningservice.service.PlannerService.PlannerValidationException;
+import com.navio.tripplanningservice.service.CurrencyConversionUnavailableException;
+import com.navio.tripplanningservice.service.MobilityOptimizationUnavailableException;
+import com.navio.tripplanningservice.service.TripEvOptimizationException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -113,6 +117,55 @@ public class GlobalExceptionHandler {
                 .error("Refresh the planner and try again")
                 .build();
         return ResponseEntity.status(HttpStatus.CONFLICT).body(errorResponse);
+    }
+
+    @ExceptionHandler(CurrencyConversionUnavailableException.class)
+    public ResponseEntity<ErrorResponse> handleCurrencyConversionUnavailable(
+            CurrencyConversionUnavailableException ex) {
+        log.warn("Currency conversion is unavailable: {}", ex.getMessage());
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .timestamp(Instant.now())
+                .status(HttpStatus.SERVICE_UNAVAILABLE.value())
+                .message("Currency conversion is temporarily unavailable")
+                .error("Try again without changing the trip currency")
+                .build();
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(errorResponse);
+    }
+
+    @ExceptionHandler(TripEvOptimizationException.class)
+    public ResponseEntity<ErrorResponse> handleTripEvOptimization(TripEvOptimizationException ex) {
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .timestamp(Instant.now())
+                .status(HttpStatus.UNPROCESSABLE_ENTITY.value())
+                .message("The EV route could not be optimized")
+                .error(ex.getMessage())
+                .build();
+        return ResponseEntity.unprocessableEntity().body(errorResponse);
+    }
+
+    @ExceptionHandler(MobilityOptimizationUnavailableException.class)
+    public ResponseEntity<ErrorResponse> handleMobilityOptimizationUnavailable(
+            MobilityOptimizationUnavailableException ex) {
+        log.warn("Mobility EV optimization is unavailable: {}", ex.getMessage());
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .timestamp(Instant.now())
+                .status(HttpStatus.SERVICE_UNAVAILABLE.value())
+                .message("EV route optimization is temporarily unavailable")
+                .error("Try again in a moment")
+                .build();
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(errorResponse);
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ErrorResponse> handleDataIntegrityViolation(DataIntegrityViolationException ex) {
+        log.error("Planner write violated a database constraint", ex);
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .timestamp(Instant.now())
+                .status(HttpStatus.UNPROCESSABLE_ENTITY.value())
+                .message("Some place details could not be saved")
+                .error("Remove or shorten the last place you added, then try again")
+                .build();
+        return ResponseEntity.unprocessableEntity().body(errorResponse);
     }
 
     @ExceptionHandler(Exception.class)

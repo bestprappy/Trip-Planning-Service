@@ -15,5 +15,7 @@ public interface ListBlockRepository extends JpaRepository<ListBlock, UUID> {
 
     Optional<ListBlock> findByIdAndTripId(UUID id, UUID tripId);
 
+    Optional<ListBlock> findByTripIdAndClientId(UUID tripId, String clientId);
+
     void deleteByTripId(UUID tripId);
 }
