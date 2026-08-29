@@ -2,12 +2,15 @@ package com.navio.tripplanningservice.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.navio.tripplanningservice.dto.PlannerBlockDto;
+import com.navio.tripplanningservice.dto.PlannerBudgetDto;
 import com.navio.tripplanningservice.dto.PlannerChecklistSubItemDto;
+import com.navio.tripplanningservice.dto.PlannerExpenseDto;
 import com.navio.tripplanningservice.dto.PlannerItemDto;
 import com.navio.tripplanningservice.dto.PlannerSaveResponse;
 import com.navio.tripplanningservice.dto.PlannerSnapshotRequest;
 import com.navio.tripplanningservice.dto.PlannerSnapshotResponse;
 import com.navio.tripplanningservice.service.PlannerService;
+import com.navio.tripplanningservice.model.CurrencyCode;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -17,6 +20,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
@@ -52,7 +56,10 @@ class PlannerControllerTest {
                         .header("X-User-Id", USER_ID))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.blocks[0].id").value("block-list-1"))
-                .andExpect(jsonPath("$.blocks[0].items[0].items[0].checked").value(true));
+                .andExpect(jsonPath("$.blocks[0].items[0].items[0].checked").value(true))
+                .andExpect(jsonPath("$.budget.currency").value("THB"))
+                .andExpect(jsonPath("$.budget.expenses[0].categoryId").value("food"))
+                .andExpect(jsonPath("$.budget.expenses[0].date").doesNotExist());
     }
 
     @Test
@@ -73,7 +80,8 @@ class PlannerControllerTest {
                         .content(objectMapper.writeValueAsString(
                                 new PlannerSnapshotRequest(
                                         snapshot.version(),
-                                        snapshot.blocks()))))
+                                        snapshot.blocks(),
+                                        snapshot.budget()))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.version").value(1))
                 .andExpect(jsonPath("$.savedAt").value("2026-08-23T00:01:00Z"))
@@ -123,8 +131,18 @@ class PlannerControllerTest {
                 LocalDate.of(2026, 9, 1),
                 "amber",
                 List.of(checklist));
+        PlannerBudgetDto budget = new PlannerBudgetDto(
+                CurrencyCode.THB,
+                new BigDecimal("30000.00"),
+                List.of(new PlannerExpenseDto(
+                        "expense-dinner",
+                        new BigDecimal("850.00"),
+                        "Dinner",
+                        "food",
+                        null)));
         return new PlannerSnapshotResponse(
                 List.of(block),
+                budget,
                 0L,
                 Instant.parse("2026-08-23T00:00:00Z"));
     }

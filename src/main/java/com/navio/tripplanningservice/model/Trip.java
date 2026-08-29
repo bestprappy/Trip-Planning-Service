@@ -6,6 +6,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
@@ -55,6 +56,15 @@ public class Trip {
     @Enumerated(EnumType.STRING)
     private TripVisibility visibility;
 
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 3)
+    private CurrencyCode budgetCurrency = CurrencyCode.THB;
+
+    @Builder.Default
+    @Column(nullable = false, precision = 14, scale = 2)
+    private BigDecimal budgetAmount = BigDecimal.ZERO;
+
     @Version
     @Column(nullable = false)
     private Long version;
@@ -71,6 +81,12 @@ public class Trip {
         updatedAt = Instant.now();
         if (version == null) {
             version = 0L;
+        }
+        if (budgetCurrency == null) {
+            budgetCurrency = CurrencyCode.THB;
+        }
+        if (budgetAmount == null) {
+            budgetAmount = BigDecimal.ZERO;
         }
     }
 
