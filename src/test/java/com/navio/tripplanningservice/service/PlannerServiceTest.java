@@ -1,27 +1,36 @@
 package com.navio.tripplanningservice.service;
 
 import com.navio.tripplanningservice.dto.PlannerBlockDto;
+import com.navio.tripplanningservice.dto.PlannerBudgetDto;
 import com.navio.tripplanningservice.dto.PlannerChecklistSubItemDto;
+import com.navio.tripplanningservice.dto.PlannerEvChargerDto;
+import com.navio.tripplanningservice.dto.PlannerExpenseDto;
 import com.navio.tripplanningservice.dto.PlannerItemDto;
 import com.navio.tripplanningservice.dto.PlannerSaveResponse;
 import com.navio.tripplanningservice.dto.PlannerSnapshotRequest;
 import com.navio.tripplanningservice.model.BlockItem;
 import com.navio.tripplanningservice.model.ChecklistSubItem;
+import com.navio.tripplanningservice.model.CurrencyCode;
+import com.navio.tripplanningservice.model.Expense;
+import com.navio.tripplanningservice.model.ExpenseCategory;
 import com.navio.tripplanningservice.model.ListBlock;
 import com.navio.tripplanningservice.model.Trip;
 import com.navio.tripplanningservice.repository.BlockItemRepository;
 import com.navio.tripplanningservice.repository.ChecklistSubItemRepository;
+import com.navio.tripplanningservice.repository.ExpenseRepository;
 import com.navio.tripplanningservice.repository.ListBlockRepository;
 import com.navio.tripplanningservice.repository.TripRepository;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 import java.time.LocalDate;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -54,6 +63,9 @@ class PlannerServiceTest {
     @Mock
     private ChecklistSubItemRepository checklistSubItemRepository;
 
+    @Mock
+    private ExpenseRepository expenseRepository;
+
     private PlannerService plannerService;
 
     private SimpleMeterRegistry meterRegistry;
@@ -66,6 +78,7 @@ class PlannerServiceTest {
                 listBlockRepository,
                 blockItemRepository,
                 checklistSubItemRepository,
+                expenseRepository,
                 meterRegistry);
     }
 
@@ -185,12 +198,132 @@ class PlannerServiceTest {
         verify(listBlockRepository).delete(block);
     }
 
+    @Test
+    void savesBudgetSettingsAndExpensesWithThePlannerSnapshot() {
+        Trip trip = ownedTrip(2L);
+        PlannerExpenseDto expense = new PlannerExpenseDto(
+                "expense-dinner",
+                new BigDecimal("850.00"),
+                "Dinner",
+                "food",
+                LocalDate.of(2026, 9, 2));
+        PlannerBudgetDto budget = new PlannerBudgetDto(
+                CurrencyCode.USD,
+                new BigDecimal("2500.00"),
+                List.of(expense));
+
+        when(tripRepository.findByIdAndUserId(TRIP_ID, USER_ID))
+                .thenReturn(Optional.of(trip));
+        when(listBlockRepository.findByTripIdOrderByDisplayOrder(TRIP_ID))
+                .thenReturn(List.of());
+        when(expenseRepository.findByTripIdOrderByDisplayOrder(TRIP_ID))
+                .thenReturn(List.of());
+        when(expenseRepository.save(any(Expense.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(tripRepository.saveAndFlush(trip)).thenAnswer(invocation -> {
+            trip.setVersion(3L);
+            return trip;
+        });
+
+        PlannerSaveResponse response = plannerService.savePlannerSnapshot(
+                TRIP_ID,
+                USER_ID,
+                new PlannerSnapshotRequest(2L, List.of(), budget));
+
+        assertEquals(3L, response.version());
+        assertEquals(CurrencyCode.USD, trip.getBudgetCurrency());
+        assertEquals(new BigDecimal("2500.00"), trip.getBudgetAmount());
+        verify(expenseRepository).save(org.mockito.ArgumentMatchers.argThat(savedExpense ->
+                savedExpense.getClientId().equals("expense-dinner")
+                        && savedExpense.getCategory() == ExpenseCategory.FOOD
+                        && savedExpense.getAmount().compareTo(new BigDecimal("850.00")) == 0));
+    }
+
     private Trip ownedTrip(long version) {
         return Trip.builder()
                 .id(TRIP_ID)
                 .userId(USER_ID)
                 .version(version)
                 .build();
+    }
+
+    @Test
+    void savesTheFullWeekdayOpeningHoursSummaryFromTheProvider() {
+        // Google Places returns opening hours as seven weekday descriptions joined together. At
+        // ~165 characters that overflowed the old VARCHAR(100) column and failed the whole autosave
+        // with a constraint violation, which surfaced as "an unexpected error occurred".
+        String weekdayHours = String.join(" | ", java.util.Collections.nCopies(7, "Monday: Open 24 hours"));
+        assertEquals(165, weekdayHours.length());
+
+        assertEquals(weekdayHours, savedOpeningHours(weekdayHours));
+    }
+
+    @Test
+    void clampsChargerTextThatWouldStillOverflowItsColumn() {
+        assertEquals("x".repeat(255), savedOpeningHours("x".repeat(400)));
+    }
+
+    private String savedOpeningHours(String openingHoursSummary) {
+        Trip trip = ownedTrip(1L);
+        ListBlock savedBlock = ListBlock.builder().id(BLOCK_ID).tripId(TRIP_ID).build();
+
+        when(tripRepository.findByIdAndUserId(TRIP_ID, USER_ID)).thenReturn(Optional.of(trip));
+        when(listBlockRepository.findByTripIdOrderByDisplayOrder(TRIP_ID)).thenReturn(List.of());
+        when(listBlockRepository.save(any(ListBlock.class))).thenReturn(savedBlock);
+        when(blockItemRepository.findByBlockIdOrderByDisplayOrder(BLOCK_ID)).thenReturn(List.of());
+        when(blockItemRepository.save(any(BlockItem.class))).thenAnswer(invocation -> {
+            BlockItem item = invocation.getArgument(0);
+            item.setId(ITEM_ID);
+            return item;
+        });
+        when(tripRepository.saveAndFlush(trip)).thenReturn(trip);
+
+        plannerService.savePlannerSnapshot(TRIP_ID, USER_ID, chargerRequest(1L, openingHoursSummary));
+
+        ArgumentCaptor<BlockItem> saved = ArgumentCaptor.forClass(BlockItem.class);
+        verify(blockItemRepository).save(saved.capture());
+        return saved.getValue().getOpeningHours();
+    }
+
+    private PlannerSnapshotRequest chargerRequest(long version, String openingHoursSummary) {
+        PlannerEvChargerDto charger = new PlannerEvChargerDto(
+                List.of("CCS2"),
+                150.0,
+                4,
+                2,
+                "Price not listed",
+                openingHoursSummary,
+                25,
+                "Operator");
+        PlannerItemDto place = new PlannerItemDto(
+                "charger-1",
+                "place",
+                "ev-charger:station-1",
+                "Charging station",
+                null,
+                "Address",
+                13.0,
+                100.0,
+                4.5,
+                10,
+                null,
+                null,
+                false,
+                null,
+                null,
+                null,
+                charger,
+                null,
+                "Charging station",
+                List.of());
+        PlannerBlockDto block = new PlannerBlockDto(
+                "block-list-1",
+                "list",
+                "Day 1",
+                LocalDate.of(2026, 9, 1),
+                "amber",
+                List.of(place));
+        return new PlannerSnapshotRequest(version, List.of(block));
     }
 
     private PlannerSnapshotRequest checklistRequest(long version) {

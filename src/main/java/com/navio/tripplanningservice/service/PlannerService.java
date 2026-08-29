@@ -1,7 +1,9 @@
 package com.navio.tripplanningservice.service;
 
 import com.navio.tripplanningservice.dto.PlannerBlockDto;
+import com.navio.tripplanningservice.dto.PlannerBudgetDto;
 import com.navio.tripplanningservice.dto.PlannerChecklistSubItemDto;
+import com.navio.tripplanningservice.dto.PlannerExpenseDto;
 import com.navio.tripplanningservice.dto.PlannerEvChargerDto;
 import com.navio.tripplanningservice.dto.PlannerItemDto;
 import com.navio.tripplanningservice.dto.PlannerSaveResponse;
@@ -9,12 +11,17 @@ import com.navio.tripplanningservice.dto.PlannerSnapshotRequest;
 import com.navio.tripplanningservice.dto.PlannerSnapshotResponse;
 import com.navio.tripplanningservice.model.BlockItem;
 import com.navio.tripplanningservice.model.ChecklistSubItem;
+import com.navio.tripplanningservice.model.CurrencyCode;
+import com.navio.tripplanningservice.model.Expense;
+import com.navio.tripplanningservice.model.ExpenseCategory;
 import com.navio.tripplanningservice.model.ListBlock;
 import com.navio.tripplanningservice.model.Trip;
 import com.navio.tripplanningservice.repository.BlockItemRepository;
 import com.navio.tripplanningservice.repository.ChecklistSubItemRepository;
+import com.navio.tripplanningservice.repository.ExpenseRepository;
 import com.navio.tripplanningservice.repository.ListBlockRepository;
 import com.navio.tripplanningservice.repository.TripRepository;
+import com.navio.tripplanningservice.support.BlockItemTextLimits;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +43,8 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import static com.navio.tripplanningservice.support.BlockItemTextLimits.clamp;
+
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -45,11 +54,12 @@ public class PlannerService {
     private final ListBlockRepository listBlockRepository;
     private final BlockItemRepository blockItemRepository;
     private final ChecklistSubItemRepository checklistSubItemRepository;
+    private final ExpenseRepository expenseRepository;
     private final MeterRegistry meterRegistry;
 
     public PlannerSnapshotResponse getPlannerSnapshot(UUID tripId, UUID userId) {
         Trip trip = requireOwnedTrip(tripId, userId);
-        return mapSnapshot(tripId, trip.getVersion(), trip.getUpdatedAt());
+        return mapSnapshot(trip);
     }
 
     @Transactional
@@ -92,6 +102,9 @@ public class PlannerService {
             }
 
             existingBlocks.values().forEach(this::deleteBlockWithChildren);
+            if (request.budget() != null) {
+                syncBudget(trip, request.budget());
+            }
             trip.setUpdatedAt(Instant.now());
             Trip savedTrip = tripRepository.saveAndFlush(trip);
             return new PlannerSaveResponse(savedTrip.getVersion(), savedTrip.getUpdatedAt());
@@ -161,13 +174,13 @@ public class PlannerService {
         item.setClientId(dto.id());
         item.setType(itemType);
         item.setDisplayOrder(displayOrder);
-        item.setTitle(resolveTitle(dto, itemType));
+        item.setTitle(clamp(resolveTitle(dto, itemType), BlockItemTextLimits.TITLE));
         item.setNotes(itemType == BlockItem.BlockItemType.NOTE ? dto.content() : dto.notes());
 
-        item.setPlaceId(dto.placeId());
-        item.setPlaceName(dto.name());
+        item.setPlaceId(clamp(dto.placeId(), BlockItemTextLimits.PLACE_ID));
+        item.setPlaceName(clamp(dto.name(), BlockItemTextLimits.NAME));
         item.setPlaceDescription(dto.description());
-        item.setPlaceAddress(dto.address());
+        item.setPlaceAddress(clamp(dto.address(), BlockItemTextLimits.ADDRESS));
         item.setPlaceLat(dto.lat());
         item.setPlaceLng(dto.lng());
         item.setPlaceRating(dto.rating());
@@ -187,10 +200,12 @@ public class PlannerService {
             item.setEvTotalConnectors(evCharger.totalConnectors());
             item.setEvAvailableConnectors(evCharger.availableConnectors());
             item.setAvailablePlugs(evCharger.availableConnectors());
-            item.setPrice(evCharger.priceText());
-            item.setOpeningHours(evCharger.openingHoursSummary());
+            item.setPrice(clamp(evCharger.priceText(), BlockItemTextLimits.PRICE));
+            item.setOpeningHours(clamp(evCharger.openingHoursSummary(), BlockItemTextLimits.OPENING_HOURS));
             item.setEstimatedChargeMinutes(evCharger.estimatedChargeMinutes());
-            item.setEvOperatorName(evCharger.operatorName());
+            item.setEvOperatorName(clamp(evCharger.operatorName(), BlockItemTextLimits.OPERATOR_NAME));
+            item.setEvSelectionSource(Objects.requireNonNullElse(evCharger.selectionSource(), "MANUAL"));
+            item.setEvLocked(Boolean.TRUE.equals(evCharger.locked()));
             item.setIsCharged(Boolean.TRUE.equals(dto.isVisited()));
         }
     }
@@ -236,6 +251,8 @@ public class PlannerService {
         item.setOpeningHours(null);
         item.setEstimatedChargeMinutes(null);
         item.setEvOperatorName(null);
+        item.setEvSelectionSource(null);
+        item.setEvLocked(false);
         item.setIsCharged(false);
     }
 
@@ -250,13 +267,66 @@ public class PlannerService {
         blockItemRepository.delete(item);
     }
 
-    private PlannerSnapshotResponse mapSnapshot(UUID tripId, long version, Instant savedAt) {
+    private void syncBudget(Trip trip, PlannerBudgetDto budgetDto) {
+        trip.setBudgetCurrency(budgetDto.currency());
+        trip.setBudgetAmount(budgetDto.amount());
+
+        Map<String, Expense> existingExpenses = expenseRepository
+                .findByTripIdOrderByDisplayOrder(trip.getId())
+                .stream()
+                .collect(Collectors.toMap(
+                        Expense::getClientId,
+                        expense -> expense,
+                        (first, ignored) -> first,
+                        LinkedHashMap::new));
+
+        List<PlannerExpenseDto> requestedExpenses = nullSafe(budgetDto.expenses());
+        for (int index = 0; index < requestedExpenses.size(); index++) {
+            PlannerExpenseDto expenseDto = requestedExpenses.get(index);
+            Expense expense = existingExpenses.remove(expenseDto.id());
+            if (expense == null) {
+                expense = Expense.builder()
+                        .tripId(trip.getId())
+                        .clientId(expenseDto.id())
+                        .build();
+            }
+            expense.setAmount(expenseDto.amount());
+            expense.setLabel(expenseDto.label().trim());
+            expense.setCategory(parseExpenseCategory(expenseDto.categoryId()));
+            expense.setExpenseDate(expenseDto.date());
+            expense.setDisplayOrder(index);
+            expenseRepository.save(expense);
+        }
+
+        expenseRepository.deleteAll(existingExpenses.values());
+    }
+
+    private PlannerSnapshotResponse mapSnapshot(Trip trip) {
+        UUID tripId = trip.getId();
         List<PlannerBlockDto> blocks = listBlockRepository
                 .findByTripIdOrderByDisplayOrder(tripId)
                 .stream()
                 .map(this::mapBlock)
                 .toList();
-        return new PlannerSnapshotResponse(blocks, version, savedAt);
+        List<PlannerExpenseDto> expenses = expenseRepository
+                .findByTripIdOrderByDisplayOrder(tripId)
+                .stream()
+                .map(expense -> new PlannerExpenseDto(
+                        expense.getClientId(),
+                        expense.getAmount(),
+                        expense.getLabel(),
+                        expense.getCategory().clientId(),
+                        expense.getExpenseDate()))
+                .toList();
+        PlannerBudgetDto budget = new PlannerBudgetDto(
+                Objects.requireNonNullElse(trip.getBudgetCurrency(), CurrencyCode.THB),
+                Objects.requireNonNullElse(trip.getBudgetAmount(), BigDecimal.ZERO),
+                expenses);
+        return new PlannerSnapshotResponse(
+                blocks,
+                budget,
+                trip.getVersion(),
+                trip.getUpdatedAt());
     }
 
     private PlannerBlockDto mapBlock(ListBlock block) {
@@ -303,7 +373,9 @@ public class PlannerService {
                         item.getPrice(),
                         item.getOpeningHours(),
                         item.getEstimatedChargeMinutes(),
-                        item.getEvOperatorName())
+                        item.getEvOperatorName(),
+                        Objects.requireNonNullElse(item.getEvSelectionSource(), "MANUAL"),
+                        Boolean.TRUE.equals(item.getEvLocked()))
                 : null;
 
         return new PlannerItemDto(
@@ -359,6 +431,33 @@ public class PlannerService {
                 }
             }
         }
+
+        if (request.budget() != null) {
+            validateBudget(request.budget());
+        }
+    }
+
+    private void validateBudget(PlannerBudgetDto budget) {
+        if (budget.currency() == null) {
+            throw new PlannerValidationException("Budget currency is required");
+        }
+        if (budget.amount() == null || budget.amount().signum() < 0) {
+            throw new PlannerValidationException("Budget amount must be non-negative");
+        }
+
+        Set<String> expenseIds = new java.util.HashSet<>();
+        for (PlannerExpenseDto expense : nullSafe(budget.expenses())) {
+            if (!expenseIds.add(expense.id())) {
+                throw new PlannerValidationException("Duplicate expense id: " + expense.id());
+            }
+            if (expense.amount() == null || expense.amount().signum() <= 0) {
+                throw new PlannerValidationException("Expense amount must be positive");
+            }
+            if (isBlank(expense.label())) {
+                throw new PlannerValidationException("Expense label is required");
+            }
+            parseExpenseCategory(expense.categoryId());
+        }
     }
 
     private void validatePlace(PlannerItemDto item) {
@@ -400,6 +499,14 @@ public class PlannerService {
             case "checklist" -> BlockItem.BlockItemType.CHECKLIST;
             default -> throw new PlannerValidationException("Unsupported planner item type: " + value);
         };
+    }
+
+    private ExpenseCategory parseExpenseCategory(String value) {
+        try {
+            return ExpenseCategory.fromClientId(value);
+        } catch (IllegalArgumentException exception) {
+            throw new PlannerValidationException(exception.getMessage());
+        }
     }
 
     private String resolveTitle(PlannerItemDto dto, BlockItem.BlockItemType type) {
