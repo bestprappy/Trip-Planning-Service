@@ -94,6 +94,9 @@ public class BlockItem {
     private String evSelectionSource;
     private Boolean evLocked;
 
+    @Column
+    private Integer targetBatteryPct;
+
     // ============ CHECKLIST ITEM FIELDS ============
     private Boolean completed;        // Checklist completion status
 

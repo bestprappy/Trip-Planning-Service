@@ -67,7 +67,7 @@ public class TripEvOptimizationApplier {
             if (existing == null) {
                 throw new TripEvOptimizationException("A charger changed after the optimization preview");
             }
-            if (Boolean.TRUE.equals(existing.getEvLocked())) {
+            if (Boolean.TRUE.equals(existing.getEvLocked()) || existing.getTargetBatteryPct() != null) {
                 throw new TripEvOptimizationException("Unlock the charger before replacing it");
             }
             items.remove(existing);

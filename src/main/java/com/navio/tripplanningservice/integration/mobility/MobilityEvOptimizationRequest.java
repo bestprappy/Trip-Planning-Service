@@ -22,8 +22,12 @@ public record MobilityEvOptimizationRequest(
             double lng,
             MobilityEvCharger charger,
             boolean locked,
-            String selectionSource
+            String selectionSource,
+            Integer targetBatteryPct
     ) {
+        public Stop(String itemId, String name, double lat, double lng, MobilityEvCharger charger, boolean locked, String selectionSource) {
+            this(itemId, name, lat, lng, charger, locked, selectionSource, null);
+        }
     }
 
     public record Vehicle(

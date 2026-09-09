@@ -1,6 +1,7 @@
 package com.navio.tripplanningservice.service;
 
 import com.navio.tripplanningservice.dto.PlannerBlockDto;
+import com.navio.tripplanningservice.dto.PlannerDestinationDto;
 import com.navio.tripplanningservice.dto.PlannerBudgetDto;
 import com.navio.tripplanningservice.dto.PlannerChecklistSubItemDto;
 import com.navio.tripplanningservice.dto.PlannerEvChargerDto;
@@ -263,6 +264,45 @@ class PlannerServiceTest {
         assertEquals("x".repeat(255), savedOpeningHours("x".repeat(400)));
     }
 
+    @Test
+    void roundTripsDayDestinationsAndChargeTargetsWithoutRemovingStops() {
+        Trip trip = ownedTrip(1L);
+        when(tripRepository.findByIdAndUserId(TRIP_ID, USER_ID)).thenReturn(Optional.of(trip));
+        when(listBlockRepository.findByTripIdOrderByDisplayOrder(TRIP_ID)).thenReturn(List.of());
+        when(listBlockRepository.save(any(ListBlock.class))).thenAnswer(call -> {
+            ListBlock block = call.getArgument(0); block.setId(BLOCK_ID); return block;
+        });
+        when(blockItemRepository.findByBlockIdOrderByDisplayOrder(BLOCK_ID)).thenReturn(List.of());
+        when(blockItemRepository.save(any(BlockItem.class))).thenAnswer(call -> {
+            BlockItem item = call.getArgument(0); item.setId(ITEM_ID); return item;
+        });
+        when(tripRepository.saveAndFlush(trip)).thenReturn(trip);
+        PlannerBlockDto original = chargerRequest(1L, "Open 24 hours", 80).blocks().getFirst();
+        PlannerDestinationDto destination = new PlannerDestinationDto("bangkok", "Bangkok", 13.75, 100.5, "Thailand");
+        PlannerBlockDto changed = new PlannerBlockDto(original.id(), "itinerary", original.title(), original.date(), original.colorId(), original.items(), destination);
+        PlannerSaveResponse ack = plannerService.savePlannerSnapshot(TRIP_ID, USER_ID, new PlannerSnapshotRequest(1L, List.of(changed)));
+        ArgumentCaptor<ListBlock> block = ArgumentCaptor.forClass(ListBlock.class);
+        ArgumentCaptor<BlockItem> item = ArgumentCaptor.forClass(BlockItem.class);
+        verify(listBlockRepository).save(block.capture());
+        verify(blockItemRepository).save(item.capture());
+        assertEquals("Bangkok", block.getValue().getDestinationName());
+        assertEquals(80, item.getValue().getTargetBatteryPct());
+        assertEquals(List.of("day-destinations", "charge-targets"), ack.capabilities());
+        when(listBlockRepository.findByTripIdOrderByDisplayOrder(TRIP_ID)).thenReturn(List.of(block.getValue()));
+        when(blockItemRepository.findByBlockIdOrderByDisplayOrder(BLOCK_ID)).thenReturn(List.of(item.getValue()));
+        var restored = plannerService.getPlannerSnapshot(TRIP_ID, USER_ID).blocks().getFirst();
+        assertEquals(destination, restored.destination());
+        assertEquals(1, restored.items().size());
+        assertEquals(80, restored.items().getFirst().evCharger().targetBatteryPct());
+    }
+
+    @Test
+    void rejectsChargeTargetsOutsideBatteryCapacityBeforeWriting() {
+        when(tripRepository.findByIdAndUserId(TRIP_ID, USER_ID)).thenReturn(Optional.of(ownedTrip(1L)));
+        assertThrows(PlannerService.PlannerValidationException.class, () -> plannerService.savePlannerSnapshot(TRIP_ID, USER_ID, chargerRequest(1L, "Open 24 hours", 101)));
+        verify(blockItemRepository, never()).save(any());
+    }
+
     private String savedOpeningHours(String openingHoursSummary) {
         Trip trip = ownedTrip(1L);
         ListBlock savedBlock = ListBlock.builder().id(BLOCK_ID).tripId(TRIP_ID).build();
@@ -286,6 +326,10 @@ class PlannerServiceTest {
     }
 
     private PlannerSnapshotRequest chargerRequest(long version, String openingHoursSummary) {
+        return chargerRequest(version, openingHoursSummary, null);
+    }
+
+    private PlannerSnapshotRequest chargerRequest(long version, String openingHoursSummary, Integer target) {
         PlannerEvChargerDto charger = new PlannerEvChargerDto(
                 List.of("CCS2"),
                 150.0,
@@ -294,7 +338,7 @@ class PlannerServiceTest {
                 "Price not listed",
                 openingHoursSummary,
                 25,
-                "Operator");
+                "Operator", "MANUAL", false, target);
         PlannerItemDto place = new PlannerItemDto(
                 "charger-1",
                 "place",

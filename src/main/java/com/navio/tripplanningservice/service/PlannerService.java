@@ -1,6 +1,7 @@
 package com.navio.tripplanningservice.service;
 
 import com.navio.tripplanningservice.dto.PlannerBlockDto;
+import com.navio.tripplanningservice.dto.PlannerDestinationDto;
 import com.navio.tripplanningservice.dto.PlannerBudgetDto;
 import com.navio.tripplanningservice.dto.PlannerChecklistSubItemDto;
 import com.navio.tripplanningservice.dto.PlannerExpenseDto;
@@ -133,6 +134,12 @@ public class PlannerService {
         block.setDisplayOrder(displayOrder);
         block.setBlockColor(dto.colorId());
         block.setBlockDate(dto.date());
+        PlannerDestinationDto destination = dto.destination();
+        block.setDestinationId(destination == null ? null : destination.id());
+        block.setDestinationName(destination == null ? null : destination.name());
+        block.setDestinationLat(destination == null ? null : destination.lat());
+        block.setDestinationLng(destination == null ? null : destination.lng());
+        block.setDestinationCountry(destination == null ? null : destination.country());
     }
 
     private void syncItems(UUID blockId, List<PlannerItemDto> requestedItemList) {
@@ -192,6 +199,7 @@ public class PlannerService {
         item.setEstimatedCost(toMoney(dto.cost()));
 
         PlannerEvChargerDto evCharger = dto.evCharger();
+        item.setTargetBatteryPct(evCharger == null ? null : evCharger.targetBatteryPct());
         if (evCharger == null) {
             clearEvSnapshot(item);
         } else {
@@ -344,7 +352,10 @@ public class PlannerService {
                 block.getName(),
                 block.getBlockDate(),
                 block.getBlockColor(),
-                items);
+                items,
+                block.getDestinationId() == null ? null : new PlannerDestinationDto(
+                        block.getDestinationId(), block.getDestinationName(),
+                        block.getDestinationLat(), block.getDestinationLng(), block.getDestinationCountry()));
     }
 
     private PlannerItemDto mapItem(BlockItem item) {
@@ -375,7 +386,7 @@ public class PlannerService {
                         item.getEstimatedChargeMinutes(),
                         item.getEvOperatorName(),
                         Objects.requireNonNullElse(item.getEvSelectionSource(), "MANUAL"),
-                        Boolean.TRUE.equals(item.getEvLocked()))
+                        Boolean.TRUE.equals(item.getEvLocked()), item.getTargetBatteryPct())
                 : null;
 
         return new PlannerItemDto(
@@ -404,6 +415,13 @@ public class PlannerService {
     private void validateSnapshot(PlannerSnapshotRequest request) {
         Set<String> blockIds = new java.util.HashSet<>();
         for (PlannerBlockDto block : nullSafe(request.blocks())) {
+            PlannerDestinationDto destination = block.destination();
+            if (destination != null && (isBlank(destination.id()) || isBlank(destination.name())
+                    || destination.lat() == null || destination.lng() == null
+                    || !Double.isFinite(destination.lat()) || Math.abs(destination.lat()) > 90
+                    || !Double.isFinite(destination.lng()) || Math.abs(destination.lng()) > 180)) {
+                throw new PlannerValidationException("Day destination must have a name and valid coordinates");
+            }
             if (!blockIds.add(block.id())) {
                 throw new PlannerValidationException("Duplicate block id: " + block.id());
             }
@@ -475,6 +493,10 @@ public class PlannerService {
             throw new PlannerValidationException("Place review count cannot be negative");
         }
         PlannerEvChargerDto evCharger = item.evCharger();
+        if (evCharger != null && evCharger.targetBatteryPct() != null
+                && (evCharger.targetBatteryPct() < 0 || evCharger.targetBatteryPct() > 100)) {
+            throw new PlannerValidationException("Target battery must be between 0 and 100 percent");
+        }
         if (evCharger != null
                 && evCharger.availableConnectors() != null
                 && evCharger.totalConnectors() != null

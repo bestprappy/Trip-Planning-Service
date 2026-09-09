@@ -148,7 +148,8 @@ public class TripEvOptimizationService {
                 item.getPlaceLng(),
                 charger,
                 charger != null && Boolean.TRUE.equals(item.getEvLocked()),
-                charger == null ? null : Objects.requireNonNullElse(item.getEvSelectionSource(), "MANUAL")
+                charger == null ? null : Objects.requireNonNullElse(item.getEvSelectionSource(), "MANUAL"),
+                item.getTargetBatteryPct()
         );
     }
 

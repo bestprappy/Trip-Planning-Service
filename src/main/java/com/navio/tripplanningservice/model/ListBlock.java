@@ -44,6 +44,17 @@ public class ListBlock {
     @Column(nullable = false)
     private LocalDate blockDate;
 
+    @Column(length = 512)
+    private String destinationId;
+    @Column
+    private String destinationName;
+    @Column
+    private Double destinationLat;
+    @Column
+    private Double destinationLng;
+    @Column
+    private String destinationCountry;
+
     @Version
     @Column(nullable = false)
     private Long version;
