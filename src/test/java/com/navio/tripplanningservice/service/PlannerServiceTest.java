@@ -1,5 +1,6 @@
 package com.navio.tripplanningservice.service;
 
+import com.navio.tripplanningservice.dto.PlannerAnchorDto;
 import com.navio.tripplanningservice.dto.PlannerBlockDto;
 import com.navio.tripplanningservice.dto.PlannerDestinationDto;
 import com.navio.tripplanningservice.dto.PlannerBudgetDto;
@@ -37,6 +38,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
@@ -287,13 +289,117 @@ class PlannerServiceTest {
         verify(blockItemRepository).save(item.capture());
         assertEquals("Bangkok", block.getValue().getDestinationName());
         assertEquals(80, item.getValue().getTargetBatteryPct());
-        assertEquals(List.of("day-destinations", "charge-targets"), ack.capabilities());
+        assertEquals(List.of("day-destinations", "charge-targets", "day-anchors"), ack.capabilities());
         when(listBlockRepository.findByTripIdOrderByDisplayOrder(TRIP_ID)).thenReturn(List.of(block.getValue()));
         when(blockItemRepository.findByBlockIdOrderByDisplayOrder(BLOCK_ID)).thenReturn(List.of(item.getValue()));
         var restored = plannerService.getPlannerSnapshot(TRIP_ID, USER_ID).blocks().getFirst();
         assertEquals(destination, restored.destination());
         assertEquals(1, restored.items().size());
         assertEquals(80, restored.items().getFirst().evCharger().targetBatteryPct());
+    }
+
+    @Test
+    void roundTripsDayStartAndEndAnchorsIncludingTheirKind() {
+        Trip trip = ownedTrip(1L);
+        when(tripRepository.findByIdAndUserId(TRIP_ID, USER_ID)).thenReturn(Optional.of(trip));
+        when(listBlockRepository.findByTripIdOrderByDisplayOrder(TRIP_ID)).thenReturn(List.of());
+        when(listBlockRepository.save(any(ListBlock.class))).thenAnswer(call -> {
+            ListBlock block = call.getArgument(0); block.setId(BLOCK_ID); return block;
+        });
+        when(blockItemRepository.findByBlockIdOrderByDisplayOrder(BLOCK_ID)).thenReturn(List.of());
+        when(tripRepository.saveAndFlush(trip)).thenReturn(trip);
+
+        PlannerAnchorDto home = new PlannerAnchorDto(
+                "20000000-0000-4000-8000-000000000009", "SAVED_PLACE", "Home", "Bangkok", 13.75, 100.5);
+        PlannerAnchorDto hotel = new PlannerAnchorDto(
+                "places/hotel-1", "PLACE", "Hua Hin Resort", "Hua Hin", 12.57, 99.95);
+
+        plannerService.savePlannerSnapshot(TRIP_ID, USER_ID,
+                new PlannerSnapshotRequest(1L, List.of(anchoredBlock(home, hotel))));
+
+        ArgumentCaptor<ListBlock> block = ArgumentCaptor.forClass(ListBlock.class);
+        verify(listBlockRepository).save(block.capture());
+        assertEquals("SAVED_PLACE", block.getValue().getStartAnchorKind());
+        assertEquals("Hua Hin Resort", block.getValue().getEndAnchorName());
+
+        when(listBlockRepository.findByTripIdOrderByDisplayOrder(TRIP_ID))
+                .thenReturn(List.of(block.getValue()));
+        var restored = plannerService.getPlannerSnapshot(TRIP_ID, USER_ID).blocks().getFirst();
+        assertEquals(home, restored.startAnchor());
+        assertEquals(hotel, restored.endAnchor());
+    }
+
+    @Test
+    void aDayWithNoAnchorsStoresNothingSoItsStartStaysDerived() {
+        Trip trip = ownedTrip(1L);
+        when(tripRepository.findByIdAndUserId(TRIP_ID, USER_ID)).thenReturn(Optional.of(trip));
+        when(listBlockRepository.findByTripIdOrderByDisplayOrder(TRIP_ID)).thenReturn(List.of());
+        when(listBlockRepository.save(any(ListBlock.class))).thenAnswer(call -> {
+            ListBlock block = call.getArgument(0); block.setId(BLOCK_ID); return block;
+        });
+        when(blockItemRepository.findByBlockIdOrderByDisplayOrder(BLOCK_ID)).thenReturn(List.of());
+        when(tripRepository.saveAndFlush(trip)).thenReturn(trip);
+
+        plannerService.savePlannerSnapshot(TRIP_ID, USER_ID,
+                new PlannerSnapshotRequest(1L, List.of(anchoredBlock(null, null))));
+
+        ArgumentCaptor<ListBlock> block = ArgumentCaptor.forClass(ListBlock.class);
+        verify(listBlockRepository).save(block.capture());
+        assertNull(block.getValue().getStartAnchorId());
+        assertNull(block.getValue().getEndAnchorId());
+    }
+
+    @Test
+    void clearingAnAnchorWipesEveryColumnRatherThanLeavingAHalfAnchor() {
+        Trip trip = ownedTrip(1L);
+        ListBlock existing = ListBlock.builder().id(BLOCK_ID).tripId(TRIP_ID).clientId("block-day-1")
+                .startAnchorId("old").startAnchorKind("PLACE").startAnchorName("Old start")
+                .startAnchorAddress("Somewhere").startAnchorLat(1.0).startAnchorLng(2.0)
+                .build();
+        when(tripRepository.findByIdAndUserId(TRIP_ID, USER_ID)).thenReturn(Optional.of(trip));
+        when(listBlockRepository.findByTripIdOrderByDisplayOrder(TRIP_ID)).thenReturn(List.of(existing));
+        when(listBlockRepository.save(any(ListBlock.class))).thenAnswer(call -> call.getArgument(0));
+        when(blockItemRepository.findByBlockIdOrderByDisplayOrder(BLOCK_ID)).thenReturn(List.of());
+        when(tripRepository.saveAndFlush(trip)).thenReturn(trip);
+
+        plannerService.savePlannerSnapshot(TRIP_ID, USER_ID,
+                new PlannerSnapshotRequest(1L, List.of(anchoredBlock(null, null))));
+
+        assertNull(existing.getStartAnchorId());
+        assertNull(existing.getStartAnchorKind());
+        assertNull(existing.getStartAnchorName());
+        assertNull(existing.getStartAnchorAddress());
+        assertNull(existing.getStartAnchorLat());
+        assertNull(existing.getStartAnchorLng());
+    }
+
+    @Test
+    void rejectsAnAnchorKindThatSharingWouldNotKnowHowToHandle() {
+        when(tripRepository.findByIdAndUserId(TRIP_ID, USER_ID)).thenReturn(Optional.of(ownedTrip(1L)));
+        PlannerAnchorDto unknown = new PlannerAnchorDto("x", "SECRET", "Home", null, 13.75, 100.5);
+
+        assertThrows(PlannerService.PlannerValidationException.class,
+                () -> plannerService.savePlannerSnapshot(TRIP_ID, USER_ID,
+                        new PlannerSnapshotRequest(1L, List.of(anchoredBlock(unknown, null)))));
+
+        verify(listBlockRepository, never()).save(any());
+    }
+
+    @Test
+    void rejectsAnAnchorWithCoordinatesOutsideTheWorld() {
+        when(tripRepository.findByIdAndUserId(TRIP_ID, USER_ID)).thenReturn(Optional.of(ownedTrip(1L)));
+        PlannerAnchorDto offWorld = new PlannerAnchorDto("x", "PLACE", "Nowhere", null, 120.0, 100.5);
+
+        assertThrows(PlannerService.PlannerValidationException.class,
+                () -> plannerService.savePlannerSnapshot(TRIP_ID, USER_ID,
+                        new PlannerSnapshotRequest(1L, List.of(anchoredBlock(null, offWorld)))));
+
+        verify(listBlockRepository, never()).save(any());
+    }
+
+    private PlannerBlockDto anchoredBlock(PlannerAnchorDto start, PlannerAnchorDto end) {
+        return new PlannerBlockDto("block-day-1", "itinerary", "Day 1",
+                LocalDate.of(2026, 9, 1), "amber", List.of(), null, start, end);
     }
 
     @Test

@@ -55,6 +55,41 @@ public class ListBlock {
     @Column
     private String destinationCountry;
 
+    /**
+     * Where this day starts, when the traveller overrode the default.
+     *
+     * <p>Normally null: a day starts where the previous one ended, and that is
+     * derived rather than stored so the two can never drift apart. It is set on
+     * the first day (the trip origin) and on any day the traveller sets out from
+     * somewhere other than last night's stop.
+     */
+    @Column(length = 512)
+    private String startAnchorId;
+    @Column(length = 20)
+    private String startAnchorKind;
+    @Column
+    private String startAnchorName;
+    @Column(length = 512)
+    private String startAnchorAddress;
+    @Column
+    private Double startAnchorLat;
+    @Column
+    private Double startAnchorLng;
+
+    /** Where this day ends — typically the night's accommodation. */
+    @Column(length = 512)
+    private String endAnchorId;
+    @Column(length = 20)
+    private String endAnchorKind;
+    @Column
+    private String endAnchorName;
+    @Column(length = 512)
+    private String endAnchorAddress;
+    @Column
+    private Double endAnchorLat;
+    @Column
+    private Double endAnchorLng;
+
     @Version
     @Column(nullable = false)
     private Long version;

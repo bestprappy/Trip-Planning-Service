@@ -8,6 +8,6 @@ public record PlannerSaveResponse(
         java.util.List<String> capabilities
 ) {
     public PlannerSaveResponse(long version, Instant savedAt) {
-        this(version, savedAt, java.util.List.of("day-destinations", "charge-targets"));
+        this(version, savedAt, java.util.List.of("day-destinations", "charge-targets", "day-anchors"));
     }
 }

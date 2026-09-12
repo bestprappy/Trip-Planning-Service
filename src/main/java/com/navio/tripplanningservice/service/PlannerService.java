@@ -1,5 +1,6 @@
 package com.navio.tripplanningservice.service;
 
+import com.navio.tripplanningservice.dto.PlannerAnchorDto;
 import com.navio.tripplanningservice.dto.PlannerBlockDto;
 import com.navio.tripplanningservice.dto.PlannerDestinationDto;
 import com.navio.tripplanningservice.dto.PlannerBudgetDto;
@@ -50,6 +51,15 @@ import static com.navio.tripplanningservice.support.BlockItemTextLimits.clamp;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class PlannerService {
+
+    /**
+     * The anchor kinds a client may send.
+     *
+     * <p>Kept as a closed set because sharing branches on it: a snapshot
+     * serialiser drops {@code SAVED_PLACE} anchors and keeps the rest, so an
+     * unrecognised kind would be published by default — the unsafe direction.
+     */
+    private static final Set<String> ANCHOR_KINDS = Set.of("SAVED_PLACE", "PLACE", "MANUAL");
 
     private final TripRepository tripRepository;
     private final ListBlockRepository listBlockRepository;
@@ -140,6 +150,22 @@ public class PlannerService {
         block.setDestinationLat(destination == null ? null : destination.lat());
         block.setDestinationLng(destination == null ? null : destination.lng());
         block.setDestinationCountry(destination == null ? null : destination.country());
+
+        PlannerAnchorDto startAnchor = dto.startAnchor();
+        block.setStartAnchorId(startAnchor == null ? null : startAnchor.id());
+        block.setStartAnchorKind(startAnchor == null ? null : startAnchor.kind());
+        block.setStartAnchorName(startAnchor == null ? null : startAnchor.name());
+        block.setStartAnchorAddress(startAnchor == null ? null : startAnchor.address());
+        block.setStartAnchorLat(startAnchor == null ? null : startAnchor.lat());
+        block.setStartAnchorLng(startAnchor == null ? null : startAnchor.lng());
+
+        PlannerAnchorDto endAnchor = dto.endAnchor();
+        block.setEndAnchorId(endAnchor == null ? null : endAnchor.id());
+        block.setEndAnchorKind(endAnchor == null ? null : endAnchor.kind());
+        block.setEndAnchorName(endAnchor == null ? null : endAnchor.name());
+        block.setEndAnchorAddress(endAnchor == null ? null : endAnchor.address());
+        block.setEndAnchorLat(endAnchor == null ? null : endAnchor.lat());
+        block.setEndAnchorLng(endAnchor == null ? null : endAnchor.lng());
     }
 
     private void syncItems(UUID blockId, List<PlannerItemDto> requestedItemList) {
@@ -355,7 +381,13 @@ public class PlannerService {
                 items,
                 block.getDestinationId() == null ? null : new PlannerDestinationDto(
                         block.getDestinationId(), block.getDestinationName(),
-                        block.getDestinationLat(), block.getDestinationLng(), block.getDestinationCountry()));
+                        block.getDestinationLat(), block.getDestinationLng(), block.getDestinationCountry()),
+                block.getStartAnchorId() == null ? null : new PlannerAnchorDto(
+                        block.getStartAnchorId(), block.getStartAnchorKind(), block.getStartAnchorName(),
+                        block.getStartAnchorAddress(), block.getStartAnchorLat(), block.getStartAnchorLng()),
+                block.getEndAnchorId() == null ? null : new PlannerAnchorDto(
+                        block.getEndAnchorId(), block.getEndAnchorKind(), block.getEndAnchorName(),
+                        block.getEndAnchorAddress(), block.getEndAnchorLat(), block.getEndAnchorLng()));
     }
 
     private PlannerItemDto mapItem(BlockItem item) {
@@ -422,6 +454,8 @@ public class PlannerService {
                     || !Double.isFinite(destination.lng()) || Math.abs(destination.lng()) > 180)) {
                 throw new PlannerValidationException("Day destination must have a name and valid coordinates");
             }
+            validateAnchor(block.startAnchor(), "Day start");
+            validateAnchor(block.endAnchor(), "Day end");
             if (!blockIds.add(block.id())) {
                 throw new PlannerValidationException("Duplicate block id: " + block.id());
             }
@@ -452,6 +486,29 @@ public class PlannerService {
 
         if (request.budget() != null) {
             validateBudget(request.budget());
+        }
+    }
+
+    /**
+     * A partly-filled anchor is rejected rather than stored.
+     *
+     * <p>A named place at null coordinates would silently skew the day's driving
+     * distance and EV state-of-charge instead of failing, so the all-or-nothing
+     * rule is enforced here as well as by the database check constraint.
+     */
+    private void validateAnchor(PlannerAnchorDto anchor, String label) {
+        if (anchor == null) {
+            return;
+        }
+        if (isBlank(anchor.id()) || isBlank(anchor.name())
+                || anchor.lat() == null || anchor.lng() == null
+                || !Double.isFinite(anchor.lat()) || Math.abs(anchor.lat()) > 90
+                || !Double.isFinite(anchor.lng()) || Math.abs(anchor.lng()) > 180) {
+            throw new PlannerValidationException(label + " must have a name and valid coordinates");
+        }
+        if (!ANCHOR_KINDS.contains(anchor.kind())) {
+            throw new PlannerValidationException(
+                    label + " kind must be SAVED_PLACE, PLACE or MANUAL");
         }
     }
 

@@ -14,7 +14,7 @@ public record PlannerSnapshotResponse(
         List<String> capabilities
 ) {
     public PlannerSnapshotResponse(List<PlannerBlockDto> blocks, PlannerBudgetDto budget, long version, Instant savedAt) {
-        this(blocks, budget, version, savedAt, List.of("day-destinations", "charge-targets"));
+        this(blocks, budget, version, savedAt, List.of("day-destinations", "charge-targets", "day-anchors"));
     }
     public PlannerSnapshotResponse(
             List<PlannerBlockDto> blocks,
