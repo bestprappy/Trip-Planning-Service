@@ -5,6 +5,8 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -57,7 +59,9 @@ public class Trip {
     @Column
     private String destinationRegion;
 
-    @Column(columnDefinition = "char(2)")
+    // Matches the char(2) column from V10; production validates the schema.
+    @JdbcTypeCode(SqlTypes.CHAR)
+    @Column(length = 2, columnDefinition = "char(2)")
     private String destinationCountryCode;
 
     // Visibility: PRIVATE, UNLISTED, PUBLIC
