@@ -13,6 +13,12 @@ import java.util.UUID;
 @Repository
 public interface TripRepository extends JpaRepository<Trip, UUID> {
 
+    @org.springframework.data.jpa.repository.Query(value = """
+            SELECT * FROM trip.trip WHERE destination_country_code IS NULL
+              AND id > :after ORDER BY id LIMIT :batchSize
+            """, nativeQuery = true)
+    java.util.List<Trip> findUnresolvedAfter(UUID after, int batchSize);
+
     Page<Trip> findByUserId(UUID userId, Pageable pageable);
 
     Page<Trip> findByUserIdAndVisibility(UUID userId, TripVisibility visibility, Pageable pageable);

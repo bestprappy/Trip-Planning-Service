@@ -33,6 +33,17 @@ public class TripResponse {
 
     private String destinationCountry;
 
+    private String destinationCity;
+
+    private String destinationRegion;
+
+    private String destinationCountryCode;
+
+    public String getTitle() {
+        return displayName != null ? displayName
+                : destinationCity != null ? destinationCity : destinationCountry;
+    }
+
     private String visibility;
 
     private Instant createdAt;

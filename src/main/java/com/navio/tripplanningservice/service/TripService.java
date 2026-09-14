@@ -22,22 +22,20 @@ import java.util.stream.Collectors;
 public class TripService {
 
     private final TripRepository tripRepository;
+    private final com.navio.tripplanningservice.integration.mobility.MobilityPlaceClient placeClient;
 
     @Transactional
     public TripResponse createTrip(UUID userId, CreateTripRequest request) {
         Trip trip = Trip.builder()
                 .userId(userId)
-                .displayName(request.getDisplayName())
+                .displayName(normalizeName(request.getDisplayName()))
                 .startDate(request.getStartDate())
                 .endDate(request.getEndDate())
                 .destinationId(request.getDestinationId())
-                .destinationName(request.getDestinationName())
-                .destinationLat(request.getDestinationLat())
-                .destinationLng(request.getDestinationLng())
-                .destinationCountry(request.getDestinationCountry())
                 .visibility(TripVisibility.PRIVATE)
                 .build();
 
+        applyDestination(trip, placeClient.getDetail(request.getDestinationId()));
         Trip savedTrip = tripRepository.save(trip);
         return mapToResponse(savedTrip);
     }
@@ -65,7 +63,7 @@ public class TripService {
                 .orElseThrow(() -> new TripNotFoundException(tripId));
 
         if (request.getDisplayName() != null) {
-            trip.setDisplayName(request.getDisplayName());
+            trip.setDisplayName(normalizeName(request.getDisplayName()));
         }
         if (request.getStartDate() != null) {
             trip.setStartDate(request.getStartDate());
@@ -73,20 +71,10 @@ public class TripService {
         if (request.getEndDate() != null) {
             trip.setEndDate(request.getEndDate());
         }
-        if (request.getDestinationId() != null) {
+        if (request.getDestinationId() != null && !request.getDestinationId().equals(trip.getDestinationId())) {
+            var detail = placeClient.getDetail(request.getDestinationId());
             trip.setDestinationId(request.getDestinationId());
-        }
-        if (request.getDestinationName() != null) {
-            trip.setDestinationName(request.getDestinationName());
-        }
-        if (request.getDestinationLat() != null) {
-            trip.setDestinationLat(request.getDestinationLat());
-        }
-        if (request.getDestinationLng() != null) {
-            trip.setDestinationLng(request.getDestinationLng());
-        }
-        if (request.getDestinationCountry() != null) {
-            trip.setDestinationCountry(request.getDestinationCountry());
+            applyDestination(trip, detail);
         }
         if (request.getVisibility() != null) {
             trip.setVisibility(TripVisibility.valueOf(request.getVisibility()));
@@ -103,6 +91,20 @@ public class TripService {
         tripRepository.delete(trip);
     }
 
+    static void applyDestination(Trip trip, com.navio.tripplanningservice.integration.mobility.MobilityPlaceDetail detail) {
+        trip.setDestinationName(detail.name());
+        trip.setDestinationLat(detail.location().lat());
+        trip.setDestinationLng(detail.location().lng());
+        trip.setDestinationCity(detail.placeLocation().city());
+        trip.setDestinationRegion(detail.placeLocation().region());
+        trip.setDestinationCountryCode(detail.placeLocation().countryCode());
+        trip.setDestinationCountry(detail.placeLocation().countryName());
+    }
+
+    private static String normalizeName(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
+    }
+
     private TripResponse mapToResponse(Trip trip) {
         return TripResponse.builder()
                 .id(trip.getId())
@@ -114,6 +116,9 @@ public class TripService {
                 .destinationLat(trip.getDestinationLat())
                 .destinationLng(trip.getDestinationLng())
                 .destinationCountry(trip.getDestinationCountry())
+                .destinationCity(trip.getDestinationCity())
+                .destinationRegion(trip.getDestinationRegion())
+                .destinationCountryCode(trip.getDestinationCountryCode())
                 .visibility(trip.getVisibility().toString())
                 .createdAt(trip.getCreatedAt())
                 .updatedAt(trip.getUpdatedAt())

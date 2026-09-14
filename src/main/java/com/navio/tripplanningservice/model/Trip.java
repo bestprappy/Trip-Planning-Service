@@ -26,7 +26,7 @@ public class Trip {
     @Column(nullable = false)
     private UUID userId;
 
-    @Column(nullable = false)
+    @Column
     private String displayName;
 
     @Column(nullable = false)
@@ -50,6 +50,15 @@ public class Trip {
 
     @Column
     private String destinationCountry;
+
+    @Column
+    private String destinationCity;
+
+    @Column
+    private String destinationRegion;
+
+    @Column(columnDefinition = "char(2)")
+    private String destinationCountryCode;
 
     // Visibility: PRIVATE, UNLISTED, PUBLIC
     @Column(nullable = false)

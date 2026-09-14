@@ -168,6 +168,16 @@ public class GlobalExceptionHandler {
         return ResponseEntity.unprocessableEntity().body(errorResponse);
     }
 
+    @ExceptionHandler(com.navio.tripplanningservice.service.PlaceResolutionUnavailableException.class)
+    public ResponseEntity<ErrorResponse> handlePlaceResolutionUnavailable(
+            com.navio.tripplanningservice.service.PlaceResolutionUnavailableException ex) {
+        log.warn("Place resolution is unavailable", ex);
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(ErrorResponse.builder()
+                .timestamp(Instant.now()).status(503)
+                .message("The destination could not be resolved")
+                .error("Try again in a moment").build());
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGenericException(Exception ex) {
         log.error("Unexpected error", ex);
@@ -175,7 +185,7 @@ public class GlobalExceptionHandler {
                 .timestamp(Instant.now())
                 .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
                 .message("An unexpected error occurred")
-                .error(ex.getMessage())
+                .error("Try again in a moment")
                 .build();
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
     }

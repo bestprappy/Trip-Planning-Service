@@ -15,7 +15,6 @@ import java.time.LocalDate;
 @Builder
 public class CreateTripRequest {
 
-    @NotBlank(message = "Display name is required")
     private String displayName;
 
     @NotNull(message = "Start date is required")
@@ -27,12 +26,4 @@ public class CreateTripRequest {
     @NotBlank(message = "Destination ID is required")
     private String destinationId;
 
-    @NotBlank(message = "Destination name is required")
-    private String destinationName;
-
-    private Double destinationLat;
-
-    private Double destinationLng;
-
-    private String destinationCountry;
 }

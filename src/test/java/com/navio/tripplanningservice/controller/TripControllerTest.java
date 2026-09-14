@@ -124,16 +124,34 @@ class TripControllerTest {
                 .andExpect(status().isNoContent());
     }
 
+    @Test
+    void acceptsCreationWithoutDisplayName() throws Exception {
+        when(tripService.createTrip(eq(USER_ID), any(CreateTripRequest.class)))
+                .thenReturn(TripResponse.builder().destinationCity("Bangkok").destinationCountryCode("TH").build());
+        var request = createRequest();
+        request.setDisplayName(null);
+        mockMvc.perform(post("/v1/trips").header("X-User-Id", USER_ID)
+                        .contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.title").value("Bangkok"))
+                .andExpect(jsonPath("$.destinationCountryCode").value("TH"));
+    }
+
+    @Test
+    void reportsResolutionFailureWithoutLeakingProviderDetails() throws Exception {
+        when(tripService.createTrip(eq(USER_ID), any(CreateTripRequest.class)))
+                .thenThrow(new com.navio.tripplanningservice.service.PlaceResolutionUnavailableException("secret provider details"));
+        mockMvc.perform(post("/v1/trips").header("X-User-Id", USER_ID)
+                        .contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(createRequest())))
+                .andExpect(status().isServiceUnavailable()).andExpect(jsonPath("$.status").value(503))
+                .andExpect(jsonPath("$.error").value("Try again in a moment"));
+    }
+
     private CreateTripRequest createRequest() {
         return CreateTripRequest.builder()
                 .displayName("Bangkok trip")
                 .startDate(LocalDate.of(2026, 9, 1))
                 .endDate(LocalDate.of(2026, 9, 4))
                 .destinationId("google:bangkok-thailand")
-                .destinationName("Bangkok, Thailand")
-                .destinationLat(13.7563)
-                .destinationLng(100.5018)
-                .destinationCountry("Thailand")
                 .build();
     }
 

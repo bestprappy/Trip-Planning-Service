@@ -21,13 +21,6 @@ public class UpdateTripRequest {
 
     private String destinationId;
 
-    private String destinationName;
-
-    private Double destinationLat;
-
-    private Double destinationLng;
-
-    private String destinationCountry;
 
     private String visibility;
 }
