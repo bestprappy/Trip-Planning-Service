@@ -31,7 +31,8 @@ class TripServiceTests {
         when(repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         var result = service.createTrip(user, CreateTripRequest.builder().destinationId("place-id").build());
         assertThat(result.getDisplayName()).isNull();
-        assertThat(result.getTitle()).isEqualTo("Bangkok");
+        assertThat(result.getTitle()).isEqualTo("Thailand");
+        assertThat(result.getDestinationName()).isEqualTo("Bangkok");
         assertThat(result.getDestinationCountryCode()).isEqualTo("TH");
         assertThat(result.getDestinationCountry()).isEqualTo("Thailand");
         assertThat(result.getDestinationLat()).isEqualTo(13.7);
@@ -70,10 +71,10 @@ class TripServiceTests {
         verifyNoInteractions(places);
     }
 
-    @Test void titleFallsBackThroughCityAndCountryAndAllowsMissingLocation() {
-        assertThat(TripResponse.builder().displayName("My trip").destinationCity("City").build().getTitle()).isEqualTo("My trip");
-        assertThat(TripResponse.builder().destinationCity("City").destinationCountry("Country").build().getTitle()).isEqualTo("City");
-        assertThat(TripResponse.builder().destinationCountry("Singapore").build().getTitle()).isEqualTo("Singapore");
+    @Test void titleFallsBackThroughCountryAndCityAndAllowsMissingLocation() {
+        assertThat(TripResponse.builder().displayName("My trip").destinationCountry("Country").build().getTitle()).isEqualTo("My trip");
+        assertThat(TripResponse.builder().destinationCity("City").destinationCountry("Country").build().getTitle()).isEqualTo("Country");
+        assertThat(TripResponse.builder().destinationCity("Singapore").build().getTitle()).isEqualTo("Singapore");
         assertThat(TripResponse.builder().build().getTitle()).isNull();
     }
 }

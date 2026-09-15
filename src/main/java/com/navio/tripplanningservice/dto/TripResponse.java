@@ -41,7 +41,7 @@ public class TripResponse {
 
     public String getTitle() {
         return displayName != null ? displayName
-                : destinationCity != null ? destinationCity : destinationCountry;
+                : destinationCountry != null ? destinationCountry : destinationCity;
     }
 
     private String visibility;
