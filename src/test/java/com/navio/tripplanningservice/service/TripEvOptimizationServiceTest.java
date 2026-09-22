@@ -4,6 +4,7 @@ import com.navio.tripplanningservice.dto.PlannerSnapshotResponse;
 import com.navio.tripplanningservice.dto.TripEvOptimizationRequest;
 import com.navio.tripplanningservice.integration.mobility.MobilityEvCharger;
 import com.navio.tripplanningservice.integration.mobility.MobilityEvOptimizationClient;
+import com.navio.tripplanningservice.integration.mobility.MobilityEvOptimizationRequest;
 import com.navio.tripplanningservice.integration.mobility.MobilityEvOptimizationResponse;
 import com.navio.tripplanningservice.model.BlockItem;
 import com.navio.tripplanningservice.model.ListBlock;
@@ -12,16 +13,20 @@ import com.navio.tripplanningservice.repository.BlockItemRepository;
 import com.navio.tripplanningservice.repository.ListBlockRepository;
 import com.navio.tripplanningservice.repository.TripRepository;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -61,6 +66,105 @@ class TripEvOptimizationServiceTest {
                 4L,
                 mobilityResponse()
         );
+    }
+
+    @Test
+    void routesTheDayFromItsStartThroughItsPlacesToItsEnd() {
+        AnchorFixture fixture = anchorFixture(
+                List.of(day("day-1", LocalDate.of(2026, 9, 22), "Home", "Hotel")),
+                List.of(place("park", "Orchid Park", 13.6, 99.9))
+        );
+        when(fixture.mobilityClient.optimize(any())).thenReturn(mobilityResponse());
+
+        fixture.service.preview(fixture.tripId, fixture.userId, request(null));
+
+        ArgumentCaptor<MobilityEvOptimizationRequest> sent = ArgumentCaptor.forClass(MobilityEvOptimizationRequest.class);
+        verify(fixture.mobilityClient).optimize(sent.capture());
+        assertThat(sent.getValue().stops())
+                .extracting(MobilityEvOptimizationRequest.Stop::itemId, MobilityEvOptimizationRequest.Stop::name)
+                .containsExactly(
+                        org.assertj.core.groups.Tuple.tuple("day-1:start", "Home"),
+                        org.assertj.core.groups.Tuple.tuple("park", "Orchid Park"),
+                        org.assertj.core.groups.Tuple.tuple("day-1:end", "Hotel")
+                );
+    }
+
+    @Test
+    void startsAndEndsADayWithoutItsOwnAnchorsAtThePreviousNightsStop() {
+        AnchorFixture fixture = anchorFixture(List.of(
+                day("day-1", LocalDate.of(2026, 9, 23), null, null),
+                day("day-0", LocalDate.of(2026, 9, 22), "Home", "Hotel")
+        ), List.of(place("park", "Orchid Park", 13.6, 99.9)));
+        when(fixture.mobilityClient.optimize(any())).thenReturn(mobilityResponse());
+
+        fixture.service.preview(fixture.tripId, fixture.userId, request(null));
+
+        ArgumentCaptor<MobilityEvOptimizationRequest> sent = ArgumentCaptor.forClass(MobilityEvOptimizationRequest.class);
+        verify(fixture.mobilityClient).optimize(sent.capture());
+        assertThat(sent.getValue().stops())
+                .extracting(MobilityEvOptimizationRequest.Stop::itemId, MobilityEvOptimizationRequest.Stop::name)
+                .containsExactly(
+                        org.assertj.core.groups.Tuple.tuple("day-1:start", "Hotel"),
+                        org.assertj.core.groups.Tuple.tuple("park", "Orchid Park"),
+                        org.assertj.core.groups.Tuple.tuple("day-1:end", "Hotel")
+                );
+    }
+
+    @Test
+    void rejectsADayWithOnePlaceAndNowhereToStartOrEndWithoutCallingMobility() {
+        AnchorFixture fixture = anchorFixture(
+                List.of(day("day-1", LocalDate.of(2026, 9, 22), null, null)),
+                List.of(place("park", "Orchid Park", 13.6, 99.9))
+        );
+
+        assertThatThrownBy(() -> fixture.service.preview(fixture.tripId, fixture.userId, request(null)))
+                .isInstanceOf(TripEvOptimizationException.class)
+                .hasMessageContaining("starting place and destination");
+        verifyNoInteractions(fixture.mobilityClient);
+    }
+
+    private ListBlock day(String clientId, LocalDate date, String startName, String endName) {
+        return ListBlock.builder()
+                .id(UUID.nameUUIDFromBytes(clientId.getBytes()))
+                .clientId(clientId)
+                .type(ListBlock.ListBlockType.ITINERARY)
+                .blockDate(date)
+                .startAnchorName(startName)
+                .startAnchorLat(startName == null ? null : 13.7)
+                .startAnchorLng(startName == null ? null : 100.5)
+                .endAnchorName(endName)
+                .endAnchorLat(endName == null ? null : 13.75)
+                .endAnchorLng(endName == null ? null : 100.47)
+                .build();
+    }
+
+    /** Trip whose day-1 holds {@code items}; {@code days} are all itinerary blocks, for anchor resolution. */
+    private AnchorFixture anchorFixture(List<ListBlock> days, List<BlockItem> items) {
+        UUID tripId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        TripRepository tripRepository = mock(TripRepository.class);
+        ListBlockRepository listBlockRepository = mock(ListBlockRepository.class);
+        BlockItemRepository itemRepository = mock(BlockItemRepository.class);
+        MobilityEvOptimizationClient mobilityClient = mock(MobilityEvOptimizationClient.class);
+        ListBlock target = days.stream().filter(day -> day.getClientId().equals("day-1")).findFirst().orElseThrow();
+        when(tripRepository.findByIdAndUserId(tripId, userId))
+                .thenReturn(Optional.of(Trip.builder().id(tripId).userId(userId).version(4L).build()));
+        when(listBlockRepository.findByTripIdAndClientId(tripId, "day-1")).thenReturn(Optional.of(target));
+        when(listBlockRepository.findByTripIdOrderByDisplayOrder(tripId)).thenReturn(days);
+        when(itemRepository.findByBlockIdOrderByDisplayOrder(target.getId())).thenReturn(items);
+        TripEvOptimizationService service = new TripEvOptimizationService(
+                tripRepository, listBlockRepository, itemRepository, mobilityClient,
+                mock(TripEvOptimizationApplier.class), mock(PlannerService.class)
+        );
+        return new AnchorFixture(tripId, userId, mobilityClient, service);
+    }
+
+    private record AnchorFixture(
+            UUID tripId,
+            UUID userId,
+            MobilityEvOptimizationClient mobilityClient,
+            TripEvOptimizationService service
+    ) {
     }
 
     private Fixture fixture() {

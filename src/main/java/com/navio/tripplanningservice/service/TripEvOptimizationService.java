@@ -16,6 +16,8 @@ import com.navio.tripplanningservice.repository.TripRepository;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -28,6 +30,9 @@ public class TripEvOptimizationService {
 
     private static final String CHARGER_PLACE_PREFIX = "ev-charger:";
     private static final String UNKNOWN_CONNECTOR = "OTHER";
+    /** Mobility's limit on route stops, including the day's start and end. */
+    private static final int MAX_ROUTE_STOPS = 25;
+    private static final int MAX_STOP_NAME_LENGTH = 240;
     private static final Set<String> SUPPORTED_CONNECTORS = Set.of(
             "CCS1",
             "CCS2",
@@ -105,16 +110,23 @@ public class TripEvOptimizationService {
     ) {
         ListBlock block = listBlockRepository.findByTripIdAndClientId(tripId, request.blockId())
                 .orElseThrow(() -> new TripEvOptimizationException("The selected itinerary block was not found"));
-        List<MobilityEvOptimizationRequest.Stop> stops = blockItemRepository
-                .findByBlockIdOrderByDisplayOrder(block.getId())
-                .stream()
+        DayAnchors anchors = resolveDayAnchors(tripId, block);
+        List<MobilityEvOptimizationRequest.Stop> stops = new ArrayList<>();
+        if (anchors.start() != null) stops.add(anchorStop(block.getClientId() + ":start", anchors.start()));
+        blockItemRepository.findByBlockIdOrderByDisplayOrder(block.getId()).stream()
                 .filter(item -> item.getType() == BlockItem.BlockItemType.PLACE
                         || item.getType() == BlockItem.BlockItemType.EV_STATION)
                 .map(this::mapStop)
-                .toList();
+                .forEach(stops::add);
+        if (anchors.end() != null) stops.add(anchorStop(dayEndStopId(block), anchors.end()));
         if (stops.size() < 2) {
             throw new TripEvOptimizationException(
                     "Add at least a starting place and destination before optimizing the EV route"
+            );
+        }
+        if (stops.size() > MAX_ROUTE_STOPS) {
+            throw new TripEvOptimizationException(
+                    "This day has more than " + MAX_ROUTE_STOPS + " stops. Split it before planning charging stops"
             );
         }
 
@@ -134,6 +146,50 @@ public class TripEvOptimizationService {
                 request.effectiveTargetSocPct(),
                 request.effectiveMaximumDetourKm()
         );
+    }
+
+    /** Route id of the day's end, matching the client's route segments; chargers before it go last. */
+    static String dayEndStopId(ListBlock block) {
+        return block.getClientId() + ":end";
+    }
+
+    private record Anchor(String name, double lat, double lng) {
+        static Anchor of(String name, Double lat, Double lng) {
+            return name == null || name.isBlank() || lat == null || lng == null ? null : new Anchor(name, lat, lng);
+        }
+    }
+
+    private record DayAnchors(Anchor start, Anchor end) {
+    }
+
+    /**
+     * Where the day starts and ends, resolved as the planner does: an unset start or end carries
+     * over from the previous day's end, so the optimized route matches the one the itinerary shows.
+     */
+    private DayAnchors resolveDayAnchors(UUID tripId, ListBlock target) {
+        Anchor carried = null;
+        List<ListBlock> days = listBlockRepository.findByTripIdOrderByDisplayOrder(tripId).stream()
+                .filter(day -> day.getType() == ListBlock.ListBlockType.ITINERARY && day.getBlockDate() != null)
+                .sorted(Comparator.comparing(ListBlock::getBlockDate))
+                .toList();
+        for (ListBlock day : days) {
+            Anchor ownStart = Anchor.of(day.getStartAnchorName(), day.getStartAnchorLat(), day.getStartAnchorLng());
+            Anchor ownEnd = Anchor.of(day.getEndAnchorName(), day.getEndAnchorLat(), day.getEndAnchorLng());
+            Anchor start = ownStart != null ? ownStart : carried;
+            Anchor end = ownEnd != null ? ownEnd : carried;
+            if (Objects.equals(day.getId(), target.getId())) {
+                return new DayAnchors(start, end);
+            }
+            carried = end;
+        }
+        return new DayAnchors(null, null);
+    }
+
+    private MobilityEvOptimizationRequest.Stop anchorStop(String id, Anchor anchor) {
+        String name = anchor.name().length() > MAX_STOP_NAME_LENGTH
+                ? anchor.name().substring(0, MAX_STOP_NAME_LENGTH)
+                : anchor.name();
+        return new MobilityEvOptimizationRequest.Stop(id, name, anchor.lat(), anchor.lng(), null, false, null);
     }
 
     private MobilityEvOptimizationRequest.Stop mapStop(BlockItem item) {

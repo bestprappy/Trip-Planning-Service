@@ -146,7 +146,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MobilityOptimizationUnavailableException.class)
     public ResponseEntity<ErrorResponse> handleMobilityOptimizationUnavailable(
             MobilityOptimizationUnavailableException ex) {
-        log.warn("Mobility EV optimization is unavailable: {}", ex.getMessage());
+        log.warn("Mobility EV optimization is unavailable: {}", ex.getMessage(), ex.getCause());
         ErrorResponse errorResponse = ErrorResponse.builder()
                 .timestamp(Instant.now())
                 .status(HttpStatus.SERVICE_UNAVAILABLE.value())
