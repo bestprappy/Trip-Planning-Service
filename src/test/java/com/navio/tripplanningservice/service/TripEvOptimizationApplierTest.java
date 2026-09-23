@@ -155,7 +155,7 @@ class TripEvOptimizationApplierTest {
                         2,
                         "Better charger"
                 )),
-                25,
+                25.0,
                 10_000,
                 20,
                 "Found one change.",

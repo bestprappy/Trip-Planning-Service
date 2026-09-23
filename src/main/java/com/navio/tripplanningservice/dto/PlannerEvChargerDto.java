@@ -13,7 +13,7 @@ public record PlannerEvChargerDto(
         @PositiveOrZero Integer availableConnectors,
         String priceText,
         String openingHoursSummary,
-        @NotNull @PositiveOrZero Integer estimatedChargeMinutes,
+        @PositiveOrZero Integer estimatedChargeMinutes,
         String operatorName,
         @Pattern(regexp = "AUTO|MANUAL") String selectionSource,
         Boolean locked,

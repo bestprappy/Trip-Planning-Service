@@ -118,7 +118,7 @@ public class TripEvOptimizationApplier {
     private BlockItem newChargerItem(
             UUID blockId,
             MobilityEvCharger charger,
-            int estimatedChargeMinutes
+            double estimatedChargeMinutes
     ) {
         BlockItem item = BlockItem.builder()
                 .blockId(blockId)
@@ -153,7 +153,7 @@ public class TripEvOptimizationApplier {
     private void applyChargerSnapshot(
             BlockItem item,
             MobilityEvCharger charger,
-            int estimatedChargeMinutes
+            double estimatedChargeMinutes
     ) {
         item.setPlaceId(clamp(CHARGER_PLACE_PREFIX + charger.id(), BlockItemTextLimits.PLACE_ID));
         item.setPlaceName(clamp(charger.name(), BlockItemTextLimits.NAME));
@@ -179,7 +179,8 @@ public class TripEvOptimizationApplier {
         item.setAvailablePlugs(charger.availableConnectors());
         item.setPrice(clamp(charger.priceText(), BlockItemTextLimits.PRICE));
         item.setOpeningHours(clamp(openingHoursSummary(charger), BlockItemTextLimits.OPENING_HOURS));
-        item.setEstimatedChargeMinutes(estimatedChargeMinutes);
+        // Existing persisted duration column is minute-granularity; projection uses the continuous contract.
+        item.setEstimatedChargeMinutes((int) Math.round(estimatedChargeMinutes));
         item.setEvOperatorName(clamp(charger.operatorName(), BlockItemTextLimits.OPERATOR_NAME));
         if (item.getEvSelectionSource() == null) {
             item.setEvSelectionSource("AUTO");

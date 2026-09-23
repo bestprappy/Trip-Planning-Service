@@ -78,6 +78,13 @@ public class Trip {
     @Column(nullable = false, precision = 14, scale = 2)
     private BigDecimal budgetAmount = BigDecimal.ZERO;
 
+    @Column(precision = 5, scale = 2)
+    private BigDecimal initialSocPct;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "jsonb")
+    private java.util.Map<String, Object> energyVehicleSnapshot;
+
     @Version
     @Column(nullable = false)
     private Long version;

@@ -105,6 +105,9 @@ public class BlockItem {
     private String reservationType;   // Hotel, Restaurant, Activity, etc.
     private String reservationDetails; // Confirmation details
 
+    @Column(precision = 5, scale = 2)
+    private BigDecimal observedSocPct;
+
     @Version
     @Column(nullable = false)
     private Long version;

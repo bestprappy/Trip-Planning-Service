@@ -6,9 +6,9 @@ public record MobilityEvOptimizationResponse(
         String blockId,
         boolean feasible,
         List<Operation> operations,
-        int finalSocPct,
+        Double finalSocPct,
         long totalDrivingSeconds,
-        int totalChargingMinutes,
+        double totalChargingMinutes,
         String message,
         List<String> warnings
 ) {
@@ -23,9 +23,9 @@ public record MobilityEvOptimizationResponse(
             String beforeItemId,
             int sequence,
             MobilityEvCharger charger,
-            int estimatedChargeMinutes,
-            int arrivalSocPct,
-            int departureSocPct,
+            double estimatedChargeMinutes,
+            double arrivalSocPct,
+            double departureSocPct,
             double detourKm,
             String reason
     ) {

@@ -127,7 +127,8 @@ public class TripEvOptimizationService {
                         vehicle.consumptionKwhPer100km(),
                         vehicle.maxAcKw(),
                         vehicle.maxDcKw(),
-                        normalizeConnectors(vehicle.connectorTypes())
+                        normalizeConnectors(vehicle.connectorTypes()),
+                        vehicle.energyModel()
                 ),
                 request.startingSocPct(),
                 request.effectiveReserveSocPct(),
@@ -149,7 +150,8 @@ public class TripEvOptimizationService {
                 charger,
                 charger != null && Boolean.TRUE.equals(item.getEvLocked()),
                 charger == null ? null : Objects.requireNonNullElse(item.getEvSelectionSource(), "MANUAL"),
-                item.getTargetBatteryPct()
+                item.getTargetBatteryPct(),
+                item.getObservedSocPct() == null ? null : item.getObservedSocPct().doubleValue()
         );
     }
 

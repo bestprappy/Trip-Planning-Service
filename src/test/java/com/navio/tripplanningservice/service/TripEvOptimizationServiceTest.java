@@ -37,7 +37,17 @@ class TripEvOptimizationServiceTest {
         assertThat(preview.baseVersion()).isEqualTo(4);
         assertThat(preview.operations()).hasSize(1);
         assertThat(preview.operations().getFirst().type()).isEqualTo("REPLACE_CHARGER");
-        verify(fixture.mobilityClient).optimize(any());
+        var sent = org.mockito.ArgumentCaptor.forClass(com.navio.tripplanningservice.integration.mobility.MobilityEvOptimizationRequest.class);
+        verify(fixture.mobilityClient).optimize(sent.capture());
+        assertThat(sent.getValue().vehicle().energyModel()).isEqualTo(request(null).vehicle().energyModel());
+    }
+
+    @Test
+    void anotherUserCannotReadOrOptimizeTheSavedTrip() {
+        Fixture fixture = fixture();
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> fixture.service.preview(fixture.tripId, UUID.randomUUID(), request(null)))
+                .isInstanceOf(TripService.TripNotFoundException.class);
+        org.mockito.Mockito.verifyNoInteractions(fixture.mobilityClient, fixture.applier);
     }
 
     @Test
@@ -108,7 +118,8 @@ class TripEvOptimizationServiceTest {
                         18.0,
                         11.0,
                         180.0,
-                        List.of("CCS2")
+                        List.of("CCS2"),
+                        new TripEvOptimizationRequest.EnergyModel("CONSUMPTION", 18.0, 75.0, null)
                 ),
                 80.0,
                 12.0,
@@ -134,7 +145,7 @@ class TripEvOptimizationServiceTest {
                         2,
                         "Better charger"
                 )),
-                25,
+                25.0,
                 10_000,
                 20,
                 "Found one change.",

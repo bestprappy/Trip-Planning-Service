@@ -33,9 +33,36 @@ class PostgresSchemaTests {
 
     @Autowired
     Flyway flyway;
+    @Autowired jakarta.persistence.EntityManager entityManager;
 
     @Test
     void migrationsApplyAndEntityMappingsMatchThePostgresSchema() {
         assertThat(flyway.info().pending()).isEmpty();
+    }
+
+    @Test
+    void tripEnergyAndObservedZeroSurviveRealPostgresReloadAndClear() {
+        var trip = com.navio.tripplanningservice.model.Trip.builder()
+            .userId(java.util.UUID.randomUUID()).startDate(java.time.LocalDate.of(2026,9,23)).endDate(java.time.LocalDate.of(2026,9,24))
+            .destinationId("test").destinationName("Test").visibility(com.navio.tripplanningservice.model.TripVisibility.PRIVATE)
+            .initialSocPct(new java.math.BigDecimal("72.25"))
+            .energyVehicleSnapshot(java.util.Map.of("version",1,"profile",java.util.Map.of("modelKind","RATED_RANGE","ratedRangeKm",480))).build();
+        entityManager.persist(trip);
+        var block = com.navio.tripplanningservice.model.ListBlock.builder().tripId(trip.getId()).clientId("day")
+            .name("Day 1").type(com.navio.tripplanningservice.model.ListBlock.ListBlockType.ITINERARY).displayOrder(0).blockDate(trip.getStartDate()).build();
+        entityManager.persist(block);
+        var stop = com.navio.tripplanningservice.model.BlockItem.builder().blockId(block.getId()).clientId("stop")
+            .type(com.navio.tripplanningservice.model.BlockItem.BlockItemType.PLACE).displayOrder(0).title("Stop")
+            .observedSocPct(java.math.BigDecimal.ZERO).build();
+        entityManager.persist(stop); entityManager.flush(); entityManager.clear();
+        var loaded = entityManager.find(com.navio.tripplanningservice.model.Trip.class, trip.getId());
+        var loadedStop = entityManager.find(com.navio.tripplanningservice.model.BlockItem.class, stop.getId());
+        assertThat(loaded.getInitialSocPct()).isEqualByComparingTo("72.25");
+        assertThat(loaded.getEnergyVehicleSnapshot()).isEqualTo(trip.getEnergyVehicleSnapshot());
+        assertThat(loadedStop.getObservedSocPct()).isEqualByComparingTo("0");
+        loaded.setInitialSocPct(null); loaded.setEnergyVehicleSnapshot(null); loadedStop.setObservedSocPct(null);
+        entityManager.flush(); entityManager.clear();
+        assertThat(entityManager.find(com.navio.tripplanningservice.model.Trip.class, trip.getId()).getInitialSocPct()).isNull();
+        assertThat(entityManager.find(com.navio.tripplanningservice.model.BlockItem.class, stop.getId()).getObservedSocPct()).isNull();
     }
 }

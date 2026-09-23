@@ -116,6 +116,7 @@ public class PlannerService {
             if (request.budget() != null) {
                 syncBudget(trip, request.budget());
             }
+            PlannerEnergyState.apply(trip, request.energyState());
             trip.setUpdatedAt(Instant.now());
             Trip savedTrip = tripRepository.saveAndFlush(trip);
             return new PlannerSaveResponse(savedTrip.getVersion(), savedTrip.getUpdatedAt());
@@ -204,6 +205,7 @@ public class PlannerService {
 
     private void applyItem(BlockItem item, PlannerItemDto dto, int displayOrder) {
         BlockItem.BlockItemType itemType = parseItemType(dto.type());
+        PlannerEnergyState.applyObservation(item, dto.type(), dto.observedSocCheckpoint());
         item.setClientId(dto.id());
         item.setType(itemType);
         item.setDisplayOrder(displayOrder);
@@ -360,7 +362,8 @@ public class PlannerService {
                 blocks,
                 budget,
                 trip.getVersion(),
-                trip.getUpdatedAt());
+                trip.getUpdatedAt(), List.of("day-destinations", "charge-targets", "day-anchors", "trip-energy-v1", "observed-soc-v1"),
+                PlannerEnergyState.read(trip));
     }
 
     private PlannerBlockDto mapBlock(ListBlock block) {
@@ -441,7 +444,7 @@ public class PlannerService {
                 evCharger,
                 "note".equals(itemType) ? Objects.requireNonNullElse(item.getNotes(), "") : null,
                 "checklist".equals(itemType) ? item.getTitle() : null,
-                checklistItems);
+                checklistItems, PlannerEnergyState.readObservation(item));
     }
 
     private void validateSnapshot(PlannerSnapshotRequest request) {

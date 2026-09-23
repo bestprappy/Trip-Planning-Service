@@ -28,6 +28,13 @@ public record PlannerItemDto(
         @Valid PlannerEvChargerDto evCharger,
         String content,
         String title,
-        List<@Valid PlannerChecklistSubItemDto> items
+        List<@Valid PlannerChecklistSubItemDto> items,
+        com.fasterxml.jackson.databind.JsonNode observedSocCheckpoint
 ) {
+    public PlannerItemDto(String id, String type, String placeId, String name, String description, String address,
+        Double lat, Double lng, Double rating, Integer reviewCount, String imageUrl, String notes, Boolean isVisited,
+        String time, String timeEnd, Double cost, PlannerEvChargerDto evCharger, String content, String title,
+        List<PlannerChecklistSubItemDto> items) {
+        this(id,type,placeId,name,description,address,lat,lng,rating,reviewCount,imageUrl,notes,isVisited,time,timeEnd,cost,evCharger,content,title,items,null);
+    }
 }

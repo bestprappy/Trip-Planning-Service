@@ -15,7 +15,7 @@ import java.util.List;
 public record TripEvOptimizationRequest(
         @NotBlank @Size(max = 160) String blockId,
         @NotNull @Valid Vehicle vehicle,
-        @NotNull @DecimalMin("1.0") @DecimalMax("100.0") Double startingSocPct,
+        @NotNull @DecimalMin("0.0") @DecimalMax("100.0") Double startingSocPct,
         @DecimalMin("1.0") @DecimalMax("40.0") Double reserveSocPct,
         @DecimalMin("20.0") @DecimalMax("95.0") Double targetSocPct,
         @DecimalMin("1.0") @DecimalMax("50.0") Double maximumDetourKm,
@@ -33,13 +33,21 @@ public record TripEvOptimizationRequest(
         return maximumDetourKm == null ? 20 : maximumDetourKm;
     }
 
+    public record EnergyModel(
+            @NotBlank @jakarta.validation.constraints.Pattern(regexp="CONSUMPTION|RATED_RANGE|UNAVAILABLE") String modelKind,
+            @Positive Double consumptionKwhPer100km, @Positive Double usableBatteryCapacityKwh, @Positive Double ratedRangeKm) {}
+
     public record Vehicle(
-            @NotNull @Positive Double batteryKwh,
-            @NotNull @Positive Double consumptionKwhPer100km,
-            @NotNull @PositiveOrZero Double maxAcKw,
-            @NotNull @PositiveOrZero Double maxDcKw,
-            @NotEmpty List<@NotBlank String> connectorTypes
+            @PositiveOrZero Double batteryKwh,
+            @PositiveOrZero Double consumptionKwhPer100km,
+            @PositiveOrZero Double maxAcKw,
+            @PositiveOrZero Double maxDcKw,
+            @NotEmpty List<@NotBlank String> connectorTypes,
+            @Valid EnergyModel energyModel
     ) {
+        public Vehicle(Double batteryKwh, Double consumptionKwhPer100km, Double maxAcKw, Double maxDcKw, List<String> connectorTypes) {
+            this(batteryKwh, consumptionKwhPer100km, maxAcKw, maxDcKw, connectorTypes, null);
+        }
         public Vehicle {
             connectorTypes = connectorTypes == null ? null : List.copyOf(connectorTypes);
         }
