@@ -18,7 +18,7 @@ public record PlannerSnapshotResponse(
         this(blocks, budget, version, savedAt, capabilities, null);
     }
     public PlannerSnapshotResponse(List<PlannerBlockDto> blocks, PlannerBudgetDto budget, long version, Instant savedAt) {
-        this(blocks, budget, version, savedAt, List.of("day-destinations", "charge-targets", "day-anchors", "trip-energy-v1", "observed-soc-v1"));
+        this(blocks, budget, version, savedAt, List.of("day-destinations", "charge-targets", "day-anchors", "trip-energy-v1", "observed-soc-v1", "trip-garage-v1"));
     }
     public PlannerSnapshotResponse(
             List<PlannerBlockDto> blocks,

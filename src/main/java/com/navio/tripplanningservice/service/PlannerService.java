@@ -362,7 +362,7 @@ public class PlannerService {
                 blocks,
                 budget,
                 trip.getVersion(),
-                trip.getUpdatedAt(), List.of("day-destinations", "charge-targets", "day-anchors", "trip-energy-v1", "observed-soc-v1"),
+                trip.getUpdatedAt(), List.of("day-destinations", "charge-targets", "day-anchors", "trip-energy-v1", "observed-soc-v1", "trip-garage-v1"),
                 PlannerEnergyState.read(trip));
     }
 

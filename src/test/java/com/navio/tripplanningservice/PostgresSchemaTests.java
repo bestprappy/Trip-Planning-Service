@@ -46,6 +46,7 @@ class PostgresSchemaTests {
             .userId(java.util.UUID.randomUUID()).startDate(java.time.LocalDate.of(2026,9,23)).endDate(java.time.LocalDate.of(2026,9,24))
             .destinationId("test").destinationName("Test").visibility(com.navio.tripplanningservice.model.TripVisibility.PRIVATE)
             .initialSocPct(new java.math.BigDecimal("72.25"))
+            .garageVehicleIds(java.util.List.of("11111111-1111-4111-8111-111111111111"))
             .energyVehicleSnapshot(java.util.Map.of("version",1,"profile",java.util.Map.of("modelKind","RATED_RANGE","ratedRangeKm",480))).build();
         entityManager.persist(trip);
         var block = com.navio.tripplanningservice.model.ListBlock.builder().tripId(trip.getId()).clientId("day")
@@ -59,10 +60,13 @@ class PostgresSchemaTests {
         var loadedStop = entityManager.find(com.navio.tripplanningservice.model.BlockItem.class, stop.getId());
         assertThat(loaded.getInitialSocPct()).isEqualByComparingTo("72.25");
         assertThat(loaded.getEnergyVehicleSnapshot()).isEqualTo(trip.getEnergyVehicleSnapshot());
+        assertThat(loaded.getGarageVehicleIds()).isEqualTo(trip.getGarageVehicleIds());
+        loaded.setGarageVehicleIds(java.util.List.of());
         assertThat(loadedStop.getObservedSocPct()).isEqualByComparingTo("0");
         loaded.setInitialSocPct(null); loaded.setEnergyVehicleSnapshot(null); loadedStop.setObservedSocPct(null);
         entityManager.flush(); entityManager.clear();
         assertThat(entityManager.find(com.navio.tripplanningservice.model.Trip.class, trip.getId()).getInitialSocPct()).isNull();
+        assertThat(entityManager.find(com.navio.tripplanningservice.model.Trip.class, trip.getId()).getGarageVehicleIds()).isEmpty();
         assertThat(entityManager.find(com.navio.tripplanningservice.model.BlockItem.class, stop.getId()).getObservedSocPct()).isNull();
     }
 }

@@ -85,6 +85,10 @@ public class Trip {
     @Column(columnDefinition = "jsonb")
     private java.util.Map<String, Object> energyVehicleSnapshot;
 
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "jsonb")
+    private java.util.List<String> garageVehicleIds;
+
     @Version
     @Column(nullable = false)
     private Long version;

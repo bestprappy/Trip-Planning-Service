@@ -10,6 +10,23 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class PlannerEnergyStateTests {
+    @Test void tripGarageRoundTripsPreservesOmissionAndClearsExplicitly() throws Exception {
+        var trip = new Trip();
+        var id = "11111111-1111-4111-8111-111111111111";
+        PlannerEnergyState.apply(trip, json.readTree("{\"garageVehicleIds\":[\"" + id + "\"]}"));
+        PlannerEnergyState.apply(trip, json.readTree("{\"initialSocPct\":50}"));
+        assertThat(trip.getGarageVehicleIds()).containsExactly(id);
+        var other = new Trip();
+        PlannerEnergyState.apply(other, PlannerEnergyState.read(trip));
+        assertThat(other.getGarageVehicleIds()).containsExactly(id);
+        PlannerEnergyState.apply(other, json.readTree("{\"garageVehicleIds\":[]}"));
+        assertThat(other.getGarageVehicleIds()).isEmpty();
+        assertThat(trip.getGarageVehicleIds()).containsExactly(id);
+        for (String invalid : new String[]{"null", "[\"bad\"]", "[\"" + id + "\",\"" + id + "\"]"}) {
+            var state = json.readTree("{\"garageVehicleIds\":" + invalid + "}");
+            assertThatThrownBy(() -> PlannerEnergyState.apply(new Trip(), state)).isInstanceOf(PlannerService.PlannerValidationException.class);
+        }
+    }
     @Test void unknownChargingDurationIsAcceptedWithoutInventingZero() throws Exception {
         var charger = json.readValue("{\"connectorTypes\":[\"CCS2\"],\"maxKw\":50,\"totalConnectors\":1,\"availableConnectors\":1,\"estimatedChargeMinutes\":null}", com.navio.tripplanningservice.dto.PlannerEvChargerDto.class);
         try (var factory = jakarta.validation.Validation.buildDefaultValidatorFactory()) {

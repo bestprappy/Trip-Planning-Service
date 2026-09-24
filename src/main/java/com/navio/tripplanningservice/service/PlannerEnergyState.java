@@ -16,8 +16,19 @@ final class PlannerEnergyState {
     private PlannerEnergyState() {}
     static void apply(Trip trip, JsonNode state) {
         if (state == null) return;
-        if (state.isNull()) { trip.setInitialSocPct(null); trip.setEnergyVehicleSnapshot(null); return; }
+        if (state.isNull()) { trip.setInitialSocPct(null); trip.setEnergyVehicleSnapshot(null); trip.setGarageVehicleIds(null); return; }
         if (!state.isObject()) fail("Invalid trip energy state");
+        if (state.has("garageVehicleIds")) {
+            var ids = state.get("garageVehicleIds");
+            if (!ids.isArray() || ids.size() > 25) fail("Trip garage must contain at most 25 vehicle IDs");
+            var values = new java.util.ArrayList<String>();
+            for (var id : ids) {
+                if (!id.isTextual() || !id.asText().matches("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")) fail("Invalid trip vehicle ID");
+                if (values.contains(id.asText())) fail("Duplicate trip vehicle ID");
+                values.add(id.asText());
+            }
+            trip.setGarageVehicleIds(values);
+        }
         if (state.has("initialSocPct")) trip.setInitialSocPct(soc(state.get("initialSocPct")));
         if (state.has("vehicleSnapshot")) {
             JsonNode snapshot = state.get("vehicleSnapshot");
@@ -78,7 +89,8 @@ final class PlannerEnergyState {
         var node=JsonNodeFactory.instance.objectNode();
         if(trip.getInitialSocPct()==null) node.putNull("initialSocPct"); else node.put("initialSocPct",trip.getInitialSocPct());
         node.set("vehicleSnapshot",JSON.valueToTree(trip.getEnergyVehicleSnapshot()));
-        return trip.getInitialSocPct()==null && trip.getEnergyVehicleSnapshot()==null ? JsonNodeFactory.instance.nullNode() : node;
+        if (trip.getGarageVehicleIds()!=null) node.set("garageVehicleIds", JSON.valueToTree(trip.getGarageVehicleIds()));
+        return trip.getInitialSocPct()==null && trip.getEnergyVehicleSnapshot()==null && trip.getGarageVehicleIds()==null ? JsonNodeFactory.instance.nullNode() : node;
     }
     static JsonNode readObservation(BlockItem item) {
         return item.getObservedSocPct()==null ? JsonNodeFactory.instance.nullNode() : JsonNodeFactory.instance.objectNode().put("socPct",item.getObservedSocPct());
