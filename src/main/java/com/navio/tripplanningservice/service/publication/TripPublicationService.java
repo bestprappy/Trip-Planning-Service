@@ -93,8 +93,8 @@ public class TripPublicationService {
         requireExpectedRevision(existing, request.expectedRevision());
 
         PublicationOptions options = request.safeOptions();
-        PublicPlanSnapshot sanitized = sanitizer.sanitize(
-                trip, plannerService.getPlannerSnapshot(tripId, userId), options);
+        PublicPlanSnapshot sanitized = sanitizer.withPublicTitle(sanitizer.sanitize(
+                trip, plannerService.getPlannerSnapshot(tripId, userId), options), request.title());
 
         TripPublication publication = existing.orElseGet(() -> TripPublication.builder()
                 .tripId(tripId)
@@ -265,7 +265,8 @@ public class TripPublicationService {
                 publication.getSanitizerVersion() == null
                         || publication.getSanitizerVersion() < PlanPublicationSanitizer.SANITIZER_VERSION,
                 publication.isListed(),
-                publication.getAuthorDisplayName());
+                publication.getAuthorDisplayName(),
+                deserialize(publication).title());
     }
 
     private Trip requireOwnedTrip(UUID tripId, UUID userId) {

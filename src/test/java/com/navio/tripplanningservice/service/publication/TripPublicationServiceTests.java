@@ -372,6 +372,25 @@ class TripPublicationServiceTests {
         assertThat(saved.getValue().getListedAt()).isNotNull();
     }
 
+    @Test
+    void publishingANameFreezesItForTheLinkAndExploreCard() {
+        givenOwnedTripAtVersion(3L);
+        when(publicationRepository.findByTripId(TRIP)).thenReturn(Optional.empty());
+        when(tokenGenerator.generate()).thenReturn("tok-title");
+        ArgumentCaptor<TripPublication> saved = ArgumentCaptor.forClass(TripPublication.class);
+        when(publicationRepository.saveAndFlush(saved.capture())).thenAnswer(call -> call.getArgument(0));
+
+        PublicationResponse response = service.publish(TRIP, OWNER,
+                new PublishPlanRequest(3L, null, PublicationOptions.none(), true, null,
+                        "  Top 10 things to do in Japan\u0007  "));
+
+        assertThat(response.title()).isEqualTo("Top 10 things to do in Japan");
+        when(publicationRepository.findByTokenAndStatus("tok-title", TripPublication.PublicationStatus.ACTIVE))
+                .thenReturn(Optional.of(saved.getValue()));
+        assertThat(service.readSharedPlan("tok-title").plan().title())
+                .isEqualTo("Top 10 things to do in Japan");
+    }
+
     /** Pressing Update must not bump a listed plan back to the top of Explore. */
     @Test
     void updatingAListedPlanKeepsItsOriginalListingTime() {

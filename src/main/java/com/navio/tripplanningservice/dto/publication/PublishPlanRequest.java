@@ -26,8 +26,14 @@ public record PublishPlanRequest(
         PublicationOptions options,
         Boolean listInExplore,
         @Size(max = 120, message = "authorDisplayName must be at most 120 characters")
-        String authorDisplayName
+        String authorDisplayName,
+        @Size(max = 120, message = "title must be at most 120 characters")
+        String title
 ) {
+    public PublishPlanRequest(Long expectedTripVersion, Integer expectedRevision,
+            PublicationOptions options, Boolean listInExplore, String authorDisplayName) {
+        this(expectedTripVersion, expectedRevision, options, listInExplore, authorDisplayName, null);
+    }
     public PublicationOptions safeOptions() {
         return PublicationOptions.orNone(options);
     }
