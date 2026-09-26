@@ -36,8 +36,16 @@ public record PublicationResponse(
         Boolean hasUnpublishedChanges,
         Boolean staleSanitizer,
         Boolean listedInExplore,
-        String authorDisplayName
+        String authorDisplayName,
+        String title
 ) {
+    public PublicationResponse(boolean published, String token, PublicationOptions options,
+            Integer revision, Instant publishedAt, Instant updatedAt,
+            Boolean hasUnpublishedChanges, Boolean staleSanitizer, Boolean listedInExplore,
+            String authorDisplayName) {
+        this(published, token, options, revision, publishedAt, updatedAt,
+                hasUnpublishedChanges, staleSanitizer, listedInExplore, authorDisplayName, null);
+    }
     public static PublicationResponse notPublished() {
         return new PublicationResponse(false, null, null, null, null, null, null, null, null, null);
     }

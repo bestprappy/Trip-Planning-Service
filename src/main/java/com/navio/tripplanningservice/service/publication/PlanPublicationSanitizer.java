@@ -115,6 +115,15 @@ public class PlanPublicationSanitizer {
                 options);
     }
 
+    /** A publish-time name replaces only the public copy, never the private trip. */
+    public PublicPlanSnapshot withPublicTitle(PublicPlanSnapshot snapshot, String requestedTitle) {
+        String title = safeText(requestedTitle);
+        if (title == null || title.isBlank()) return snapshot;
+        return new PublicPlanSnapshot(snapshot.sanitizerVersion(), title,
+                snapshot.destinationCity(), snapshot.destinationCountry(), snapshot.startDate(),
+                snapshot.endDate(), snapshot.dayCount(), snapshot.days(), snapshot.budget(), snapshot.included());
+    }
+
     private PublicDayDto sanitizeDay(PlannerBlockDto block, int dayNumber, PublicationOptions options) {
         List<PublicItemDto> items = new ArrayList<>();
         for (PlannerItemDto item : nullSafe(block.items())) {
