@@ -7,6 +7,7 @@ import com.navio.tripplanningservice.service.PlannerService.PlannerValidationExc
 import com.navio.tripplanningservice.service.CurrencyConversionUnavailableException;
 import com.navio.tripplanningservice.service.MobilityOptimizationUnavailableException;
 import com.navio.tripplanningservice.service.TripEvOptimizationException;
+import com.navio.tripplanningservice.service.publication.TripPublicationService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -14,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.ServletRequestBindingException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -97,6 +99,25 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(errorResponse);
     }
 
+    /**
+     * Without this, the catch-all below turns an unsupported verb into a 500.
+     *
+     * <p>That matters most on {@code /v1/shared-plans/**}, the one anonymous
+     * prefix: a 500 there reads as "the server broke handling your write", while
+     * the truth is that the route accepts reads only. It also hides genuine
+     * faults, since a routing mistake and an internal error look the same.
+     */
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ErrorResponse> handleMethodNotAllowed(HttpRequestMethodNotSupportedException ex) {
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .timestamp(Instant.now())
+                .status(HttpStatus.METHOD_NOT_ALLOWED.value())
+                .message("That action is not supported here")
+                .error("This address does not accept " + ex.getMethod() + " requests")
+                .build();
+        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).body(errorResponse);
+    }
+
     @ExceptionHandler(PlannerValidationException.class)
     public ResponseEntity<ErrorResponse> handlePlannerValidation(PlannerValidationException ex) {
         ErrorResponse errorResponse = ErrorResponse.builder()
@@ -154,6 +175,39 @@ public class GlobalExceptionHandler {
                 .error("Try again in a moment")
                 .build();
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(errorResponse);
+    }
+
+    /**
+     * The anonymous read path's only failure.
+     *
+     * <p>The body is fixed and carries nothing from the exception: no trip
+     * title, no owner, no reason. A probe holding a guessed token must not be
+     * able to separate "no such link" from "that link was withdrawn", since the
+     * second confirms a plan exists. Logged at nothing — a stranger opening a
+     * dead link is routine, not an incident.
+     */
+    @ExceptionHandler(TripPublicationService.SharedPlanUnavailableException.class)
+    public ResponseEntity<ErrorResponse> handleSharedPlanUnavailable(
+            TripPublicationService.SharedPlanUnavailableException ex) {
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .timestamp(Instant.now())
+                .status(HttpStatus.NOT_FOUND.value())
+                .message("This shared plan is no longer available")
+                .error("The link may have been replaced, or sharing may have been stopped")
+                .build();
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
+    }
+
+    @ExceptionHandler(TripPublicationService.PublicationConflictException.class)
+    public ResponseEntity<ErrorResponse> handlePublicationConflict(
+            TripPublicationService.PublicationConflictException ex) {
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .timestamp(Instant.now())
+                .status(HttpStatus.CONFLICT.value())
+                .message(ex.getMessage())
+                .error("Refresh the plan and review what will be shared before publishing")
+                .build();
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(errorResponse);
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)
