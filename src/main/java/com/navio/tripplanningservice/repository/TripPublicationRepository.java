@@ -5,6 +5,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
@@ -44,6 +45,22 @@ public interface TripPublicationRepository extends JpaRepository<TripPublication
     Page<TripPublication> findListedInExplore(
             @Param("minimumSanitizerVersion") int minimumSanitizerVersion,
             Pageable pageable);
+
+    @Query("""
+            select p from TripPublication p
+            where p.listedInExplore = true
+              and p.status = com.navio.tripplanningservice.model.TripPublication.PublicationStatus.ACTIVE
+              and p.token is not null
+              and p.sanitizerVersion >= :minimumSanitizerVersion
+            order by p.viewCount desc, p.listedAt desc
+            """)
+    Page<TripPublication> findTrendingInExplore(
+            @Param("minimumSanitizerVersion") int minimumSanitizerVersion,
+            Pageable pageable);
+
+    @Modifying
+    @Query("update TripPublication p set p.viewCount = p.viewCount + 1 where p.id = :id")
+    void incrementViewCount(@Param("id") UUID id);
 
     void deleteByTripId(UUID tripId);
 }

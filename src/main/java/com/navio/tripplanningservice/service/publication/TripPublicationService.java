@@ -2,7 +2,16 @@ package com.navio.tripplanningservice.service.publication;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.navio.tripplanningservice.dto.PlannerSnapshotResponse;
+import com.navio.tripplanningservice.dto.PlannerSnapshotRequest;
+import com.navio.tripplanningservice.dto.PlannerBlockDto;
+import com.navio.tripplanningservice.dto.PlannerItemDto;
+import com.navio.tripplanningservice.dto.PlannerChecklistSubItemDto;
+import com.navio.tripplanningservice.dto.PlannerBudgetDto;
+import com.navio.tripplanningservice.dto.PlannerExpenseDto;
+import com.navio.tripplanningservice.dto.PlannerEvChargerDto;
+import com.navio.tripplanningservice.dto.TripResponse;
 import com.navio.tripplanningservice.dto.publication.ExplorePlanSummary;
+import com.navio.tripplanningservice.dto.publication.PublicItemDto;
 import com.navio.tripplanningservice.dto.publication.PublicPlanSnapshot;
 import com.navio.tripplanningservice.dto.publication.PublicationOptions;
 import com.navio.tripplanningservice.dto.publication.PublicationResponse;
@@ -23,6 +32,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -55,6 +65,7 @@ public class TripPublicationService {
     private final ShareTokenGenerator tokenGenerator;
     private final ObjectMapper objectMapper;
     private final ExplorePlanSummarizer summarizer;
+    private final TripService tripService;
 
     public PublicationResponse getPublication(UUID tripId, UUID userId) {
         Trip trip = requireOwnedTrip(tripId, userId);
@@ -107,6 +118,7 @@ public class TripPublicationService {
             publication.setToken(tokenGenerator.generate());
             publication.setPublishedAt(Instant.now());
             publication.setRevokedAt(null);
+            publication.setViewCount(0L);
         }
         publication.setStatus(TripPublication.PublicationStatus.ACTIVE);
         publication.setSnapshot(serialize(sanitized));
@@ -161,6 +173,7 @@ public class TripPublicationService {
      * was withdrawn", because the second confirms a trip exists and that someone
      * decided to stop showing it.
      */
+    @Transactional
     public SharedPlanResponse readSharedPlan(String token) {
         if (token == null || token.isBlank()) {
             throw new SharedPlanUnavailableException();
@@ -178,8 +191,12 @@ public class TripPublicationService {
             throw new SharedPlanUnavailableException();
         }
 
+        PublicPlanSnapshot snapshot = deserialize(publication);
+        if (publication.isListed()) {
+            publicationRepository.incrementViewCount(publication.getId());
+        }
         return new SharedPlanResponse(
-                deserialize(publication),
+                snapshot,
                 publication.getPublishedAt(),
                 publication.isListed(),
                 publication.getAuthorDisplayName());
@@ -217,8 +234,13 @@ public class TripPublicationService {
      * page rather than failing the whole feed for everyone.
      */
     public Page<ExplorePlanSummary> listExplorePlans(Pageable pageable) {
-        Page<TripPublication> rows = publicationRepository.findListedInExplore(
-                PlanPublicationSanitizer.SANITIZER_VERSION, pageable);
+        return listExplorePlans(pageable, false);
+    }
+
+    public Page<ExplorePlanSummary> listExplorePlans(Pageable pageable, boolean trending) {
+        Page<TripPublication> rows = trending
+                ? publicationRepository.findTrendingInExplore(PlanPublicationSanitizer.SANITIZER_VERSION, pageable)
+                : publicationRepository.findListedInExplore(PlanPublicationSanitizer.SANITIZER_VERSION, pageable);
 
         List<ExplorePlanSummary> summaries = new ArrayList<>(rows.getNumberOfElements());
         for (TripPublication row : rows.getContent()) {
@@ -232,6 +254,103 @@ public class TripPublicationService {
             }
         }
         return new PageImpl<>(summaries, pageable, rows.getTotalElements());
+    }
+
+    /** Make a private editable copy using only the frozen, public snapshot. */
+    @Transactional
+    public TripResponse copySharedPlan(String token, UUID userId) {
+        TripPublication publication = publicationRepository
+                .findByTokenAndStatus(token, TripPublication.PublicationStatus.ACTIVE)
+                .filter(TripPublication::isListed)
+                .filter(row -> row.getSanitizerVersion() >= PlanPublicationSanitizer.SANITIZER_VERSION)
+                .orElseThrow(SharedPlanUnavailableException::new);
+        PublicPlanSnapshot publicPlan = deserialize(publication);
+        var publicDays = publicPlan.days() == null ? List.<com.navio.tripplanningservice.dto.publication.PublicDayDto>of() : publicPlan.days();
+        PublicItemDto firstLocatedStop = publicDays.stream()
+                .flatMap(day -> day.items() == null ? java.util.stream.Stream.<PublicItemDto>empty() : day.items().stream())
+                .filter(item -> item.lat() != null && item.lng() != null)
+                .findFirst().orElse(null);
+        String destination = publicPlan.destinationCity() == null || publicPlan.destinationCity().isBlank()
+                ? "Shared trip" : publicPlan.destinationCity();
+        LocalDate start = LocalDate.now();
+        int dayCount = Math.max(1, publicPlan.dayCount());
+        Trip copy = Trip.builder()
+                .userId(userId)
+                .displayName(publicPlan.title())
+                .startDate(start)
+                .endDate(start.plusDays(dayCount - 1L))
+                .destinationId("shared-plan:" + publication.getId())
+                .destinationName(destination)
+                .destinationLat(firstLocatedStop == null ? null : firstLocatedStop.lat())
+                .destinationLng(firstLocatedStop == null ? null : firstLocatedStop.lng())
+                .destinationCity(publicPlan.destinationCity())
+                .destinationCountry(publicPlan.destinationCountry())
+                .visibility(com.navio.tripplanningservice.model.TripVisibility.PRIVATE)
+                .build();
+        copy = tripRepository.saveAndFlush(copy);
+
+        List<PlannerBlockDto> blocks = new ArrayList<>();
+        int dayIndex = 0;
+        for (var publicDay : publicDays) {
+            LocalDate day = start.plusDays(dayIndex);
+            List<PlannerItemDto> items = new ArrayList<>();
+            for (PublicItemDto item : publicDay.items() == null ? List.<PublicItemDto>of() : publicDay.items()) {
+                PlannerItemDto copied = copyPublishedItem(item);
+                if (copied != null) items.add(copied);
+            }
+            blocks.add(new PlannerBlockDto(
+                    "copied-day-" + UUID.randomUUID(), "itinerary", day.toString(), day,
+                    "teal", items));
+            dayIndex++;
+        }
+
+        PlannerBudgetDto budget = null;
+        if (publicPlan.budget() != null) {
+            var sharedBudget = publicPlan.budget();
+            List<PlannerExpenseDto> expenses = sharedBudget.expenses().stream()
+                    .map(expense -> new PlannerExpenseDto("copied-expense-" + UUID.randomUUID(),
+                            expense.amount(), expense.label(), expense.categoryId(), null))
+                    .toList();
+            budget = new PlannerBudgetDto(sharedBudget.currency(), sharedBudget.amount(), expenses);
+        }
+        plannerService.savePlannerSnapshot(copy.getId(), userId,
+                new PlannerSnapshotRequest(copy.getVersion(), blocks, budget));
+        return tripService.getTripById(copy.getId(), userId);
+    }
+
+    private PlannerItemDto copyPublishedItem(PublicItemDto item) {
+        if (item == null || item.type() == null) return null;
+        String id = "copied-item-" + UUID.randomUUID();
+        return switch (item.type().toLowerCase(java.util.Locale.ROOT)) {
+            case "place", "charger" -> item.placeId() != null
+                    && item.lat() != null && item.lng() != null
+                    ? new PlannerItemDto(id, "place", item.placeId(), item.name(),
+                            item.description(), Objects.requireNonNullElse(item.address(), ""),
+                            item.lat(), item.lng(), item.rating(),
+                            item.reviewCount(), item.imageUrl(), item.notes(), false,
+                            item.time(), item.timeEnd(), item.cost(), copyCharger(item.charger()),
+                            null, null, null)
+                    : new PlannerItemDto(id, "note", null, null, null, null, null, null,
+                            null, null, null, null, null, null, null, null, null,
+                            "Stop to locate: " + (item.name() == null ? "Unnamed stop" : item.name()), null, null);
+            case "note" -> new PlannerItemDto(id, "note", null, null, null, null, null, null,
+                            null, null, null, null, null, null, null, null, null,
+                            item.noteContent(), null, null);
+            case "checklist" -> new PlannerItemDto(id, "checklist", null, null, null, null, null, null,
+                            null, null, null, null, null, null, null, null, null, null,
+                            item.checklistTitle(), item.checklistLabels() == null ? List.of() : item.checklistLabels().stream()
+                                    .map(sub -> new PlannerChecklistSubItemDto(
+                                            "copied-check-" + UUID.randomUUID(), sub, false))
+                                    .toList());
+            default -> null;
+        };
+    }
+
+    private PlannerEvChargerDto copyCharger(com.navio.tripplanningservice.dto.publication.PublicChargerDto charger) {
+        if (charger == null) return null;
+        return new PlannerEvChargerDto(charger.connectorTypes(), charger.maxKw(),
+                charger.totalConnectors(), null, charger.priceText(),
+                charger.openingHoursSummary(), 0, charger.operatorName(), "MANUAL", false, null);
     }
 
     private void requireExpectedRevision(Optional<TripPublication> existing, Integer expectedRevision) {
