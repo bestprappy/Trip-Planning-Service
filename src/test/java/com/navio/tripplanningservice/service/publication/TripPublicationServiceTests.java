@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.navio.tripplanningservice.dto.PlannerBlockDto;
 import com.navio.tripplanningservice.dto.PlannerSnapshotResponse;
+import com.navio.tripplanningservice.dto.PlannerItemDto;
+import com.navio.tripplanningservice.dto.PlannerSnapshotRequest;
 import com.navio.tripplanningservice.dto.publication.ExplorePlanSummary;
 import com.navio.tripplanningservice.dto.publication.PublicationOptions;
 import com.navio.tripplanningservice.dto.publication.PublicationResponse;
@@ -54,6 +56,7 @@ class TripPublicationServiceTests {
     @Mock TripPublicationRepository publicationRepository;
     @Mock PlannerService plannerService;
     @Mock ShareTokenGenerator tokenGenerator;
+    @Mock TripService tripService;
 
     private TripPublicationService service;
 
@@ -66,7 +69,7 @@ class TripPublicationServiceTests {
                 new PlanPublicationSanitizer(),
                 tokenGenerator,
                 new ObjectMapper().registerModule(new JavaTimeModule()),
-                new ExplorePlanSummarizer());
+                new ExplorePlanSummarizer(), tripService);
     }
 
     // ---------------------------------------------------------- authorization
@@ -489,6 +492,104 @@ class TripPublicationServiceTests {
                 .thenReturn(Optional.of(listed));
 
         assertThat(service.readSharedPlan("tok-existing").listedInExplore()).isTrue();
+    }
+
+    @Test
+    void copyRejectsAnUnlistedPlanWithoutReadingItsOwnerTrip() {
+        TripPublication unlisted = activePublication(2);
+        when(publicationRepository.findByTokenAndStatus("tok-existing", TripPublication.PublicationStatus.ACTIVE))
+                .thenReturn(Optional.of(unlisted));
+
+        assertThatThrownBy(() -> service.copySharedPlan("tok-existing", STRANGER))
+                .isInstanceOf(TripPublicationService.SharedPlanUnavailableException.class);
+        verifyNoInteractions(tripRepository, plannerService, tripService);
+    }
+
+    @Test
+    void copyUsesFrozenSnapshotEvenAfterOwnerMakesPrivateEdits() {
+        TripPublication listed = activePublication(2);
+        listed.setListedInExplore(true);
+        when(publicationRepository.findByTokenAndStatus("tok-existing", TripPublication.PublicationStatus.ACTIVE))
+                .thenReturn(Optional.of(listed));
+        when(tripRepository.saveAndFlush(any())).thenAnswer(call -> {
+            Trip copy = call.getArgument(0);
+            copy.setId(UUID.randomUUID());
+            copy.setVersion(0L);
+            return copy;
+        });
+
+        service.copySharedPlan("tok-existing", STRANGER);
+
+        verify(tripRepository, never()).findById(TRIP);
+        verify(plannerService, never()).getPlannerSnapshot(TRIP, OWNER);
+    }
+
+    @Test
+    void copyCreatesPrivatePlanWithOnlyPublishedItineraryContent() {
+        TripPublication listed = activePublication(2);
+        listed.setListedInExplore(true);
+        listed.setSnapshot("""
+                {"sanitizerVersion":1,"title":"Shared title","destinationCity":"Bangkok","dayCount":1,
+                 "days":[{"label":"Day 1","items":[{"type":"place","name":"Wat Arun","description":"Temple"}]}],
+                 "included":{"includeDates":false,"includeNotes":false,"includeBudget":false}}
+                """);
+        when(publicationRepository.findByTokenAndStatus("tok-existing", TripPublication.PublicationStatus.ACTIVE))
+                .thenReturn(Optional.of(listed));
+        when(tripRepository.saveAndFlush(any())).thenAnswer(call -> {
+            Trip copy = call.getArgument(0);
+            copy.setId(UUID.randomUUID());
+            copy.setVersion(0L);
+            return copy;
+        });
+
+        service.copySharedPlan("tok-existing", STRANGER);
+
+        ArgumentCaptor<Trip> copiedTrip = ArgumentCaptor.forClass(Trip.class);
+        verify(tripRepository).saveAndFlush(copiedTrip.capture());
+        assertThat(copiedTrip.getValue().getUserId()).isEqualTo(STRANGER);
+        assertThat(copiedTrip.getValue().getVisibility()).isEqualTo(TripVisibility.PRIVATE);
+        assertThat(copiedTrip.getValue().getDisplayName()).isEqualTo("Shared title");
+        ArgumentCaptor<PlannerSnapshotRequest> copiedPlan = ArgumentCaptor.forClass(PlannerSnapshotRequest.class);
+        verify(plannerService).savePlannerSnapshot(any(), org.mockito.ArgumentMatchers.eq(STRANGER), copiedPlan.capture());
+        assertThat(copiedPlan.getValue().blocks()).hasSize(1);
+        assertThat(copiedPlan.getValue().blocks().getFirst().items()).hasSize(1);
+        PlannerItemDto copiedStop = copiedPlan.getValue().blocks().getFirst().items().getFirst();
+        assertThat(copiedStop.type()).isEqualTo("note");
+        assertThat(copiedStop.content()).contains("Wat Arun");
+        assertThat(copiedStop.lat()).isNull();
+        verify(tripRepository, never()).findById(TRIP);
+        verify(plannerService, never()).getPlannerSnapshot(TRIP, OWNER);
+        assertThat(copiedPlan.getValue().budget()).isNull();
+    }
+
+    @Test
+    void copyTurnsALocatedPublishedStopIntoARealPlace() {
+        TripPublication listed = activePublication(2);
+        listed.setListedInExplore(true);
+        listed.setSnapshot("""
+                {"sanitizerVersion":1,"title":"Shared title","dayCount":1,
+                 "days":[{"label":"Day 1","items":[{"type":"place","name":"Wat Arun",
+                   "placeId":"places/wat-arun","lat":13.7437,"lng":100.4888}]}]}
+                """);
+        when(publicationRepository.findByTokenAndStatus("tok-existing", TripPublication.PublicationStatus.ACTIVE))
+                .thenReturn(Optional.of(listed));
+        when(tripRepository.saveAndFlush(any())).thenAnswer(call -> {
+            Trip copy = call.getArgument(0);
+            copy.setId(UUID.randomUUID());
+            copy.setVersion(0L);
+            return copy;
+        });
+
+        service.copySharedPlan("tok-existing", STRANGER);
+
+        ArgumentCaptor<PlannerSnapshotRequest> copiedPlan = ArgumentCaptor.forClass(PlannerSnapshotRequest.class);
+        verify(plannerService).savePlannerSnapshot(any(), org.mockito.ArgumentMatchers.eq(STRANGER), copiedPlan.capture());
+        PlannerItemDto copiedStop = copiedPlan.getValue().blocks().getFirst().items().getFirst();
+        assertThat(copiedStop.type()).isEqualTo("place");
+        assertThat(copiedStop.placeId()).isEqualTo("places/wat-arun");
+        assertThat(copiedStop.address()).isEmpty();
+        assertThat(copiedStop.lat()).isEqualTo(13.7437);
+        assertThat(copiedStop.lng()).isEqualTo(100.4888);
     }
 
     // ------------------------------------------------------------------ byline

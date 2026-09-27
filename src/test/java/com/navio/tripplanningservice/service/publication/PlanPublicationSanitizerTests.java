@@ -46,6 +46,7 @@ class PlanPublicationSanitizerTests {
     private static final String HOME_PLACE_ID = "saved-place-home-7f3a";
     private static final double HOME_LAT = 13.7796;
     private static final double HOME_LNG = 100.5414;
+    private static final String STOP_PLACE_ID = "places/wat-arun";
 
     private final PlanPublicationSanitizer sanitizer = new PlanPublicationSanitizer();
     private final ObjectMapper mapper = new ObjectMapper().registerModule(new JavaTimeModule());
@@ -177,20 +178,33 @@ class PlanPublicationSanitizerTests {
     }
 
     @Test
-    void neverPublishesCoordinatesAddressesOrProviderIdsForAnyPlace() {
+    void publishesAStopsLocationSoItCanBeMappedAndCopied() {
         PlannerBlockDto day = itineraryDay("d1", LocalDate.of(2026, 3, 1))
                 .withItems(place("i1", "Wat Arun").build())
                 .build();
 
-        String json = toJson(sanitizeSnapshot(PublicationOptions.none(), day));
+        PublicItemDto published = sanitizeDays(day, PublicationOptions.none()).getFirst().items().getFirst();
 
-        assertThat(json)
-                .doesNotContain("\"lat\"")
-                .doesNotContain("\"lng\"")
-                .doesNotContain("\"address\"")
-                .doesNotContain("\"placeId\"")
-                .doesNotContain("13.74")
-                .doesNotContain("100.49");
+        assertThat(published.placeId()).isEqualTo(STOP_PLACE_ID);
+        assertThat(published.address()).isEqualTo("Wat Arun Rd, Bangkok");
+        assertThat(published.lat()).isEqualTo(13.7437);
+        assertThat(published.lng()).isEqualTo(100.4888);
+    }
+
+    @Test
+    void dropsTheWholeLocationOfAStopWhoseCoordinatesAreInvalid() {
+        PlannerItemDto broken = new PlannerItemDto("i1", "place", STOP_PLACE_ID, "Wat Arun", null,
+                "Wat Arun Rd, Bangkok", 91.0, 100.4888, null, null, null, null, null,
+                null, null, null, null, null, null, null);
+        PlannerBlockDto day = itineraryDay("d1", LocalDate.of(2026, 3, 1)).withItems(broken).build();
+
+        PublicItemDto published = sanitizeDays(day, PublicationOptions.none()).getFirst().items().getFirst();
+
+        assertThat(published.name()).isEqualTo("Wat Arun");
+        assertThat(published.placeId()).isNull();
+        assertThat(published.address()).isNull();
+        assertThat(published.lat()).isNull();
+        assertThat(published.lng()).isNull();
     }
 
     // ----------------------------------------------------------------- options
@@ -372,11 +386,12 @@ class PlanPublicationSanitizerTests {
     /**
      * The whole structural boundary in one assertion.
      *
-     * <p>The owner's home is planted in every field the <em>system</em> holds it
-     * in — both day anchors, the day destination, a place address, a provider
-     * place id, raw coordinates — and every option is turned on, so no option
-     * flag is doing the work. None of it may reach the recipient. If a future
-     * edit adds a field that forwards a stored location, this fails.
+     * <p>The owner's home is planted in every private field the <em>system</em>
+     * holds it in — both day anchors and the day destination, with their provider
+     * id and raw coordinates — and every option is turned on, so no option flag
+     * is doing the work. None of it may reach the recipient. Itinerary stops are
+     * public places and publish their own location; that is covered by
+     * {@link #publishesAStopsLocationSoItCanBeMappedAndCopied()}.
      *
      * <p>Note what is deliberately not planted here: text the owner typed. That
      * case is {@link #ownerTypedTextIsPublishedWhenTheOwnerOptsIn()}, and the
@@ -390,7 +405,7 @@ class PlanPublicationSanitizerTests {
                 .withStart(new PlannerAnchorDto(HOME_PLACE_ID, "SAVED_PLACE", HOME, HOME, HOME_LAT, HOME_LNG))
                 .withEnd(new PlannerAnchorDto(HOME_PLACE_ID, "SAVED_PLACE", HOME, HOME, HOME_LAT, HOME_LNG))
                 .withDestination(new PlannerDestinationDto(HOME_PLACE_ID, HOME, HOME_LAT, HOME_LNG, "Thailand"))
-                .withItems(place("i1", "PTT Station").withAddress(HOME).withCharger(charger).build())
+                .withItems(place("i1", "PTT Station").withCharger(charger).build())
                 .build();
         PlannerBudgetDto budget = new PlannerBudgetDto(CurrencyCode.THB, new BigDecimal("20000.00"),
                 List.of(new PlannerExpenseDto("e1", new BigDecimal("3200.00"), "Hotel", "accommodation",
@@ -596,7 +611,7 @@ class PlanPublicationSanitizerTests {
         }
 
         PlannerItemDto build() {
-            return new PlannerItemDto(id, "place", HOME_PLACE_ID, name, "A landmark", address,
+            return new PlannerItemDto(id, "place", STOP_PLACE_ID, name, "A landmark", address,
                     13.7437, 100.4888, 4.6, 12000, imageUrl, notes, true,
                     "09:00", "11:00", cost, charger, null, null, null);
         }
