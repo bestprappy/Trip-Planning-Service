@@ -21,6 +21,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -162,6 +163,29 @@ class SharedPlanControllerTests {
         verify(publicationService).listExplorePlans(captured.capture());
         assertThat(captured.getValue().getPageSize()).isEqualTo(SharedPlanController.MAX_PAGE_SIZE);
         assertThat(captured.getValue().getPageNumber()).isZero();
+    }
+
+    @Test
+    void servesTrendingPlansByViewCount() throws Exception {
+        when(publicationService.listExplorePlans(any(Pageable.class), org.mockito.ArgumentMatchers.eq(true)))
+                .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
+
+        mockMvc.perform(get("/v1/shared-plans").param("sort", "trending"))
+                .andExpect(status().isOk());
+
+        verify(publicationService).listExplorePlans(any(Pageable.class), org.mockito.ArgumentMatchers.eq(true));
+    }
+
+    @Test
+    void copyingRequiresAGatewayUserIdentity() throws Exception {
+        mockMvc.perform(post("/v1/shared-plans/{token}/copies", TOKEN))
+                .andExpect(status().isBadRequest());
+
+        UUID caller = UUID.randomUUID();
+        mockMvc.perform(post("/v1/shared-plans/{token}/copies", TOKEN)
+                        .header("X-User-Id", caller))
+                .andExpect(status().isCreated());
+        verify(publicationService).copySharedPlan(TOKEN, caller);
     }
 
     @Test

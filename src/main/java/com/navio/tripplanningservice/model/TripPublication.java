@@ -84,6 +84,11 @@ public class TripPublication {
     @Column
     private Instant listedAt;
 
+    /** Public reads since the current link was published; used for Explore ranking. */
+    @Builder.Default
+    @Column(nullable = false)
+    private Long viewCount = 0L;
+
     /** Byline frozen at publish/list time; see V11. */
     @Column(length = 120)
     private String authorDisplayName;

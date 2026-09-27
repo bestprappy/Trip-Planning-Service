@@ -41,13 +41,10 @@ import java.util.Set;
  *       replaced by a placeholder. Crucially the check is an <em>allowlist</em>
  *       of kinds that may be published, not a denylist of {@code SAVED_PLACE};
  *       a kind added later, or a corrupted one, redacts rather than leaks.</li>
- *   <li><b>Nothing derived from a location is published at all.</b> There are no
- *       coordinates, addresses or provider place ids in the public types, and no
- *       route geometry, leg distance, drive duration or battery projection. That
- *       is why redaction here cannot be undone by arithmetic: a reader given
- *       "Private start location" has no distance from it to the first stop, so
- *       there is no circle to intersect. Removing the derived data by
- *       construction is what makes removing the anchor mean anything.</li>
+ *   <li><b>Only stops keep coordinates.</b> Itinerary places and chargers are
+ *       public provider places and publish their position. Day anchors, route
+ *       geometry, leg distance, drive duration and battery projection do not,
+ *       so no published figure can triangulate a redacted anchor.</li>
  * </ol>
  *
  * <p>The class is a pure function of its arguments — no repositories, no clock,
@@ -181,8 +178,17 @@ public class PlanPublicationSanitizer {
         };
     }
 
+    /**
+     * Itinerary stops keep their location.
+     *
+     * <p>A stop is a public place or charging station the owner picked from a
+     * provider search, not their address book, so its position is what makes
+     * the published plan readable on a map and copyable as real stops. Day
+     * anchors, which can be private, never pass through here.
+     */
     private PublicItemDto sanitizePlace(PlannerItemDto item, PublicationOptions options) {
         PublicChargerDto charger = sanitizeCharger(item.evCharger());
+        boolean located = isCoordinate(item.lat(), 90) && isCoordinate(item.lng(), 180);
         return new PublicItemDto(
                 charger == null ? "place" : "charger",
                 safeText(item.name()),
@@ -197,7 +203,15 @@ public class PlanPublicationSanitizer {
                 null,
                 null,
                 null,
-                charger);
+                charger,
+                located ? safeText(item.placeId()) : null,
+                located ? safeText(item.address()) : null,
+                located ? item.lat() : null,
+                located ? item.lng() : null);
+    }
+
+    private boolean isCoordinate(Double value, double bound) {
+        return value != null && Double.isFinite(value) && Math.abs(value) <= bound;
     }
 
     private PublicItemDto sanitizeNote(PlannerItemDto item) {
