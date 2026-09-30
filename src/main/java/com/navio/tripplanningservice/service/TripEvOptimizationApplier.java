@@ -93,7 +93,10 @@ public class TripEvOptimizationApplier {
             if (operation.charger() == null) {
                 throw new TripEvOptimizationException("Mobility returned an incomplete charger operation");
             }
-            int insertionIndex = indexOfClientItem(items, operation.beforeItemId());
+            // A charger on the leg into the day's end has no saved item after it, so it goes last.
+            int insertionIndex = TripEvOptimizationService.dayEndStopId(block).equals(operation.beforeItemId())
+                    ? items.size()
+                    : indexOfClientItem(items, operation.beforeItemId());
             if (insertionIndex < 0) {
                 throw new TripEvOptimizationException("The charger insertion point no longer exists");
             }

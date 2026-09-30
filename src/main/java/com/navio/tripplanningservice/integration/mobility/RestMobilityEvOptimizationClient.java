@@ -7,6 +7,7 @@ import org.springframework.cloud.client.discovery.DiscoveryClient;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 
 import java.net.URI;
 
@@ -50,6 +51,13 @@ public class RestMobilityEvOptimizationClient implements MobilityEvOptimizationC
                 );
             }
             return response;
+        } catch (RestClientResponseException exception) {
+            // Mobility's own error body names the rejected field or failure; keep it for the log only.
+            throw new MobilityOptimizationUnavailableException(
+                    "Mobility EV optimization returned " + exception.getStatusCode().value()
+                            + ": " + exception.getResponseBodyAsString(),
+                    exception
+            );
         } catch (RestClientException exception) {
             throw new MobilityOptimizationUnavailableException(
                     "Mobility EV optimization is unavailable",

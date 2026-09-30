@@ -55,6 +55,21 @@ class TripEvOptimizationApplierTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
+    void appendsAChargerPlannedBeforeTheDaysEndAfterTheLastSavedPlace() {
+        Fixture fixture = fixture(false);
+        ArgumentCaptor<Iterable<BlockItem>> savedItems = ArgumentCaptor.forClass(Iterable.class);
+
+        fixture.applier.apply(fixture.tripId, fixture.userId, "day-1", 4, optimization("ADD_CHARGER", null, "day-1:end"));
+
+        verify(fixture.itemRepository).saveAll(savedItems.capture());
+        List<BlockItem> itinerary = StreamSupport.stream(savedItems.getValue().spliterator(), false).toList();
+        assertThat(itinerary).hasSize(4);
+        assertThat(itinerary.getLast().getStationId()).isEqualTo("better");
+        assertThat(itinerary.get(2).getClientId()).isEqualTo("destination");
+    }
+
+    @Test
     void refusesToReplaceAChargerThatWasLockedAfterThePreview() {
         Fixture fixture = fixture(true);
 
@@ -119,6 +134,10 @@ class TripEvOptimizationApplierTest {
     }
 
     private MobilityEvOptimizationResponse optimization() {
+        return optimization("REPLACE_CHARGER", "bad-item", "destination");
+    }
+
+    private MobilityEvOptimizationResponse optimization(String type, String oldItemId, String beforeItemId) {
         MobilityEvCharger charger = new MobilityEvCharger(
                 "better",
                 "Better charger",
@@ -144,9 +163,9 @@ class TripEvOptimizationApplierTest {
                 "day-1",
                 true,
                 List.of(new MobilityEvOptimizationResponse.Operation(
-                        "REPLACE_CHARGER",
-                        "bad-item",
-                        "destination",
+                        type,
+                        oldItemId,
+                        beforeItemId,
                         1,
                         charger,
                         20,

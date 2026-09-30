@@ -41,6 +41,42 @@ class PostgresSchemaTests {
     }
 
     @Test
+    void publishedSchemaUpgradesWithoutReplacingPublishedMigrations() throws Exception {
+        String baseUrl = System.getenv("NAVIO_TEST_DB_URL");
+        String username = System.getenv().getOrDefault("NAVIO_TEST_DB_USERNAME", "tripplanner");
+        String password = System.getenv().getOrDefault("NAVIO_TEST_DB_PASSWORD", "tripplanner");
+        String database = "navio_upgrade_" + java.util.UUID.randomUUID().toString().replace("-", "");
+        String upgradeUrl = baseUrl.substring(0, baseUrl.lastIndexOf('/') + 1) + database;
+        try (var admin = java.sql.DriverManager.getConnection(baseUrl, username, password);
+             var statement = admin.createStatement()) {
+            statement.execute("CREATE DATABASE " + database);
+            try {
+                Flyway.configure().dataSource(upgradeUrl, username, password)
+                    .schemas("trip").defaultSchema("trip").target("13").load().migrate();
+                try (var connection = java.sql.DriverManager.getConnection(upgradeUrl, username, password);
+                     var sql = connection.createStatement()) {
+                    sql.execute("INSERT INTO trip.trip (id, user_id, display_name, start_date, end_date, destination_id, destination_name) VALUES ('11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222', 'Preserved trip', CURRENT_DATE, CURRENT_DATE, 'test', 'Test')");
+                }
+                var upgraded = Flyway.configure().dataSource(upgradeUrl, username, password)
+                    .schemas("trip").defaultSchema("trip").load();
+                assertThat(upgraded.migrate().migrationsExecuted).isEqualTo(2);
+                upgraded.validate();
+                try (var connection = java.sql.DriverManager.getConnection(upgradeUrl, username, password);
+                     var sql = connection.createStatement();
+                     var row = sql.executeQuery("SELECT display_name, initial_soc_pct, energy_vehicle_snapshot, garage_vehicle_ids FROM trip.trip WHERE id = '11111111-1111-4111-8111-111111111111'")) {
+                    assertThat(row.next()).isTrue();
+                    assertThat(row.getString(1)).isEqualTo("Preserved trip");
+                    assertThat(row.getObject(2)).isNull();
+                    assertThat(row.getObject(3)).isNull();
+                    assertThat(row.getObject(4)).isNull();
+                }
+            } finally {
+                statement.execute("DROP DATABASE " + database);
+            }
+        }
+    }
+
+    @Test
     void tripEnergyAndObservedZeroSurviveRealPostgresReloadAndClear() {
         var trip = com.navio.tripplanningservice.model.Trip.builder()
             .userId(java.util.UUID.randomUUID()).startDate(java.time.LocalDate.of(2026,9,23)).endDate(java.time.LocalDate.of(2026,9,24))
