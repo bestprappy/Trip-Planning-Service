@@ -73,8 +73,13 @@ public class TripEvOptimizationService {
             TripEvOptimizationRequest request
     ) {
         Trip trip = requireOwnedTrip(tripId, userId);
-        MobilityEvOptimizationResponse response = mobilityClient.optimize(buildMobilityRequest(tripId, request));
-        return mapPreview(trip.getVersion(), response);
+        checkVersion(trip, request);
+        long version = trip.getVersion();
+        var input = buildMobilityRequest(trip, request, false);
+        requireCurrentVersion(tripId, userId, version);
+        MobilityEvOptimizationResponse response = mobilityClient.optimize(input);
+        requireCurrentVersion(tripId, userId, version);
+        return mapPreview(version, response);
     }
 
     public PlannerSnapshotResponse apply(
@@ -90,7 +95,9 @@ public class TripEvOptimizationService {
             throw new ObjectOptimisticLockingFailureException(Trip.class, tripId);
         }
 
-        MobilityEvOptimizationResponse response = mobilityClient.optimize(buildMobilityRequest(tripId, request));
+        var input = buildMobilityRequest(trip, request, true);
+        requireCurrentVersion(tripId, userId, request.expectedVersion());
+        MobilityEvOptimizationResponse response = mobilityClient.optimize(input);
         if (!response.feasible()) {
             throw new TripEvOptimizationException(response.message());
         }
@@ -105,11 +112,43 @@ public class TripEvOptimizationService {
     }
 
     private MobilityEvOptimizationRequest buildMobilityRequest(
-            UUID tripId,
-            TripEvOptimizationRequest request
+            Trip trip,
+            TripEvOptimizationRequest request,
+            boolean applying
     ) {
+        UUID tripId = trip.getId();
+        var vehicle = TripOptimizationEnergy.vehicle(trip, applying);
         ListBlock block = listBlockRepository.findByTripIdAndClientId(tripId, request.blockId())
                 .orElseThrow(() -> new TripEvOptimizationException("The selected itinerary block was not found"));
+        List<ListBlock> days = listBlockRepository.findByTripIdOrderByDisplayOrder(tripId).stream()
+                .filter(day -> day.getType() == ListBlock.ListBlockType.ITINERARY && day.getBlockDate() != null)
+                .sorted(Comparator.comparing(ListBlock::getBlockDate)).toList();
+        int targetIndex = days.indexOf(block);
+        if (targetIndex < 0) throw new TripEvOptimizationException("Select a dated itinerary day before optimizing");
+        List<MobilityEvOptimizationRequest.Day> preceding = days.subList(0, targetIndex).stream()
+                .map(day -> new MobilityEvOptimizationRequest.Day(day.getClientId(), routeStops(tripId, day))).toList();
+        List<MobilityEvOptimizationRequest.Stop> stops = routeStops(tripId, block);
+        if (stops.size() < 2) {
+            throw new TripEvOptimizationException("Add at least a starting place and destination before optimizing the EV route");
+        }
+        return new MobilityEvOptimizationRequest(request.blockId(), stops, vehicle,
+                TripOptimizationEnergy.initialSoc(trip), request.effectiveReserveSocPct(),
+                request.effectiveTargetSocPct(), request.effectiveMaximumDetourKm(), preceding);
+    }
+
+    private void checkVersion(Trip trip, TripEvOptimizationRequest request) {
+        if (request.expectedVersion() != null && !Objects.equals(trip.getVersion(), request.expectedVersion())) {
+            throw new ObjectOptimisticLockingFailureException(Trip.class, trip.getId());
+        }
+    }
+
+    private void requireCurrentVersion(UUID tripId, UUID userId, long version) {
+        long current = tripRepository.findCurrentVersion(tripId, userId)
+                .orElseThrow(() -> new TripService.TripNotFoundException(tripId));
+        if (current != version) throw new ObjectOptimisticLockingFailureException(Trip.class, tripId);
+    }
+
+    private List<MobilityEvOptimizationRequest.Stop> routeStops(UUID tripId, ListBlock block) {
         DayAnchors anchors = resolveDayAnchors(tripId, block);
         List<MobilityEvOptimizationRequest.Stop> stops = new ArrayList<>();
         if (anchors.start() != null) stops.add(anchorStop(block.getClientId() + ":start", anchors.start()));
@@ -119,34 +158,13 @@ public class TripEvOptimizationService {
                 .map(this::mapStop)
                 .forEach(stops::add);
         if (anchors.end() != null) stops.add(anchorStop(dayEndStopId(block), anchors.end()));
-        if (stops.size() < 2) {
-            throw new TripEvOptimizationException(
-                    "Add at least a starting place and destination before optimizing the EV route"
-            );
-        }
         if (stops.size() > MAX_ROUTE_STOPS) {
             throw new TripEvOptimizationException(
                     "This day has more than " + MAX_ROUTE_STOPS + " stops. Split it before planning charging stops"
             );
         }
 
-        TripEvOptimizationRequest.Vehicle vehicle = request.vehicle();
-        return new MobilityEvOptimizationRequest(
-                request.blockId(),
-                stops,
-                new MobilityEvOptimizationRequest.Vehicle(
-                        vehicle.batteryKwh(),
-                        vehicle.consumptionKwhPer100km(),
-                        vehicle.maxAcKw(),
-                        vehicle.maxDcKw(),
-                        normalizeConnectors(vehicle.connectorTypes()),
-                        vehicle.energyModel()
-                ),
-                request.startingSocPct(),
-                request.effectiveReserveSocPct(),
-                request.effectiveTargetSocPct(),
-                request.effectiveMaximumDetourKm()
-        );
+        return stops;
     }
 
     /** Route id of the day's end, matching the client's route segments; chargers before it go last. */
@@ -198,6 +216,9 @@ public class TripEvOptimizationService {
             throw new TripEvOptimizationException("Every route place needs coordinates before optimization");
         }
         MobilityEvCharger charger = isCharger(item) ? mapCharger(item) : null;
+        if (isCharger(item) && charger == null) {
+            throw new TripEvOptimizationException("A saved charging stop has incomplete specifications. Refresh or replace it before optimizing; its charging cannot be assumed to be zero");
+        }
         return new MobilityEvOptimizationRequest.Stop(
                 item.getClientId(),
                 Objects.requireNonNullElse(item.getPlaceName(), item.getTitle()),
@@ -207,14 +228,15 @@ public class TripEvOptimizationService {
                 charger != null && Boolean.TRUE.equals(item.getEvLocked()),
                 charger == null ? null : Objects.requireNonNullElse(item.getEvSelectionSource(), "MANUAL"),
                 item.getTargetBatteryPct(),
-                item.getObservedSocPct() == null ? null : item.getObservedSocPct().doubleValue()
+                item.getObservedSocPct() == null ? null : item.getObservedSocPct().doubleValue(),
+                item.getEstimatedChargeMinutes()
         );
     }
 
     /**
      * Maps a saved charger item to its Mobility snapshot, or {@code null} when the snapshot is too
-     * incomplete to model. An older or partially saved charger then travels as an ordinary waypoint
-     * instead of failing the whole route optimization.
+     * incomplete to model. The caller rejects an incomplete saved charging event rather than
+     * silently treating it as an ordinary waypoint with no charging.
      */
     private MobilityEvCharger mapCharger(BlockItem item) {
         String chargerId = item.getStationId();

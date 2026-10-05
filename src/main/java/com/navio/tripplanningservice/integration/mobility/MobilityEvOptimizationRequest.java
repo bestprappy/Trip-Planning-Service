@@ -9,10 +9,20 @@ public record MobilityEvOptimizationRequest(
         double startingSocPct,
         double reserveSocPct,
         double targetSocPct,
-        double maximumDetourKm
+        double maximumDetourKm,
+        List<Day> precedingDays
 ) {
+    public MobilityEvOptimizationRequest(String blockId, List<Stop> stops, Vehicle vehicle, double startingSocPct,
+                                         double reserveSocPct, double targetSocPct, double maximumDetourKm) {
+        this(blockId, stops, vehicle, startingSocPct, reserveSocPct, targetSocPct, maximumDetourKm, List.of());
+    }
     public MobilityEvOptimizationRequest {
         stops = List.copyOf(stops);
+        precedingDays = List.copyOf(precedingDays);
+    }
+
+    public record Day(String blockId, List<Stop> stops) {
+        public Day { stops = List.copyOf(stops); }
     }
 
     public record Stop(
@@ -24,8 +34,12 @@ public record MobilityEvOptimizationRequest(
             boolean locked,
             String selectionSource,
             Integer targetBatteryPct,
-            Double observedSocPct
+            Double observedSocPct,
+            Integer estimatedChargeMinutes
     ) {
+        public Stop(String itemId, String name, double lat, double lng, MobilityEvCharger charger, boolean locked, String selectionSource, Integer targetBatteryPct, Double observedSocPct) {
+            this(itemId, name, lat, lng, charger, locked, selectionSource, targetBatteryPct, observedSocPct, null);
+        }
         public Stop(String itemId, String name, double lat, double lng, MobilityEvCharger charger, boolean locked, String selectionSource, Integer targetBatteryPct) {
             this(itemId, name, lat, lng, charger, locked, selectionSource, targetBatteryPct, null);
         }

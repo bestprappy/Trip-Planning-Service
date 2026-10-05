@@ -41,7 +41,7 @@ public class RestMobilityEvOptimizationClient implements MobilityEvOptimizationC
                     .baseUrl(baseUrl.toString())
                     .build()
                     .post()
-                    .uri("/internal/v1/ev-route/optimize")
+                    .uri("/internal/v1/ev-route/optimize-canonical")
                     .body(request)
                     .retrieve()
                     .body(MobilityEvOptimizationResponse.class);

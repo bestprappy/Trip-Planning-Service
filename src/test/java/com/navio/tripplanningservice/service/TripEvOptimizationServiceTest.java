@@ -158,7 +158,8 @@ class TripEvOptimizationServiceTest {
         MobilityEvOptimizationClient mobilityClient = mock(MobilityEvOptimizationClient.class);
         ListBlock target = days.stream().filter(day -> day.getClientId().equals("day-1")).findFirst().orElseThrow();
         when(tripRepository.findByIdAndUserId(tripId, userId))
-                .thenReturn(Optional.of(Trip.builder().id(tripId).userId(userId).version(4L).build()));
+                .thenReturn(Optional.of(savedTrip(tripId, userId)));
+        when(tripRepository.findCurrentVersion(tripId, userId)).thenReturn(Optional.of(4L));
         when(listBlockRepository.findByTripIdAndClientId(tripId, "day-1")).thenReturn(Optional.of(target));
         when(listBlockRepository.findByTripIdOrderByDisplayOrder(tripId)).thenReturn(days);
         when(itemRepository.findByBlockIdOrderByDisplayOrder(target.getId())).thenReturn(items);
@@ -187,10 +188,13 @@ class TripEvOptimizationServiceTest {
         MobilityEvOptimizationClient mobilityClient = mock(MobilityEvOptimizationClient.class);
         TripEvOptimizationApplier applier = mock(TripEvOptimizationApplier.class);
         PlannerService plannerService = mock(PlannerService.class);
-        Trip trip = Trip.builder().id(tripId).userId(userId).version(4L).build();
-        ListBlock block = ListBlock.builder().id(blockId).tripId(tripId).clientId("day-1").build();
+        Trip trip = savedTrip(tripId, userId);
+        ListBlock block = ListBlock.builder().id(blockId).tripId(tripId).clientId("day-1")
+                .type(ListBlock.ListBlockType.ITINERARY).blockDate(LocalDate.of(2026, 9, 22)).build();
         when(tripRepository.findByIdAndUserId(tripId, userId)).thenReturn(Optional.of(trip));
+        when(tripRepository.findCurrentVersion(tripId, userId)).thenReturn(Optional.of(4L));
         when(listBlockRepository.findByTripIdAndClientId(tripId, "day-1")).thenReturn(Optional.of(block));
+        when(listBlockRepository.findByTripIdOrderByDisplayOrder(tripId)).thenReturn(List.of(block));
         when(itemRepository.findByBlockIdOrderByDisplayOrder(blockId)).thenReturn(List.of(
                 place("origin", "Origin", 13, 100),
                 chargerItem("bad-item", "bad", 13, 101),
@@ -210,7 +214,9 @@ class TripEvOptimizationServiceTest {
                 mobilityClient,
                 applier,
                 plannerService,
-                service
+                service,
+                trip,
+                tripRepository
         );
     }
 
@@ -312,7 +318,69 @@ class TripEvOptimizationServiceTest {
             MobilityEvOptimizationClient mobilityClient,
             TripEvOptimizationApplier applier,
             PlannerService plannerService,
-            TripEvOptimizationService service
+            TripEvOptimizationService service,
+            Trip trip,
+            TripRepository tripRepository
     ) {
+    }
+
+    private Trip savedTrip(UUID id, UUID userId) {
+        return Trip.builder().id(id).userId(userId).version(4L).initialSocPct(new java.math.BigDecimal("80"))
+                .energyVehicleSnapshot(Map.of("profile", Map.of("modelKind", "CONSUMPTION", "selectionMode", "USER_OVERRIDE",
+                        "consumptionSource", "USER_OBSERVED", "consumptionKwhPer100km", 18.0, "usableBatteryCapacityKwh", 75.0),
+                        "maxAcKw", 11.0, "maxDcKw", 180.0, "connectorTypes", List.of("CCS2"))).build();
+    }
+
+    @Test
+    void ignoresForgedRequestVehicleAndStartingBattery() {
+        var f = fixture();
+        f.trip.setInitialSocPct(new java.math.BigDecimal("42"));
+        when(f.mobilityClient.optimize(any())).thenReturn(mobilityResponse());
+        var forged = new TripEvOptimizationRequest("day-1", new TripEvOptimizationRequest.Vehicle(900.0, 1.0, 900.0, 900.0, List.of("NACS")), 100.0, 12.0, 70.0, 20.0, 4L);
+        f.service.preview(f.tripId, f.userId, forged);
+        var sent = ArgumentCaptor.forClass(MobilityEvOptimizationRequest.class);
+        verify(f.mobilityClient).optimize(sent.capture());
+        assertThat(sent.getValue().startingSocPct()).isEqualTo(42);
+        assertThat(sent.getValue().vehicle().energyModel().consumptionKwhPer100km()).isEqualTo(18);
+        assertThat(sent.getValue().vehicle().connectorTypes()).containsExactly("CCS2");
+    }
+
+    @Test
+    void rejectsStalePreviewBeforeCallingMobility() {
+        var f = fixture();
+        assertThatThrownBy(() -> f.service.preview(f.tripId, f.userId, request(3L)))
+                .isInstanceOf(org.springframework.orm.ObjectOptimisticLockingFailureException.class);
+        verifyNoInteractions(f.mobilityClient, f.applier);
+    }
+
+    @Test
+    void ratedRangeCanPreviewButCannotApplyEvenWithForgedDirectRequest() {
+        var f = fixture();
+        f.trip.setEnergyVehicleSnapshot(Map.of("profile", Map.of("modelKind", "RATED_RANGE", "ratedRangeKm", 480), "connectorTypes", List.of("CCS2")));
+        when(f.mobilityClient.optimize(any())).thenReturn(mobilityResponse());
+        f.service.preview(f.tripId, f.userId, request(null));
+        assertThatThrownBy(() -> f.service.apply(f.tripId, f.userId, request(4L)))
+                .isInstanceOf(TripEvOptimizationException.class).hasMessageContaining("preview-only");
+        verifyNoInteractions(f.applier);
+        verify(f.mobilityClient).optimize(any());
+    }
+
+    @Test
+    void rejectsChangesWhileMobilityIsCalculating() {
+        var f = fixture();
+        when(f.tripRepository.findCurrentVersion(f.tripId, f.userId)).thenReturn(Optional.of(4L), Optional.of(5L));
+        when(f.mobilityClient.optimize(any())).thenReturn(mobilityResponse());
+        assertThatThrownBy(() -> f.service.preview(f.tripId, f.userId, request(4L)))
+                .isInstanceOf(org.springframework.orm.ObjectOptimisticLockingFailureException.class);
+    }
+
+    @Test
+    void incompleteChargerCannotBecomeAnOrdinaryWaypoint() {
+        var item = chargerItem("incomplete", "station", 13, 100);
+        item.setPowerKw(null);
+        var f = anchorFixture(List.of(day("day-1", LocalDate.of(2026,9,22), "Home", "Hotel")), List.of(item));
+        assertThatThrownBy(() -> f.service.preview(f.tripId, f.userId, request(null)))
+                .isInstanceOf(TripEvOptimizationException.class).hasMessageContaining("incomplete specifications");
+        verifyNoInteractions(f.mobilityClient);
     }
 }
