@@ -108,6 +108,10 @@ public class BlockItem {
     @Column(precision = 5, scale = 2)
     private BigDecimal observedSocPct;
 
+    /** How this stop is reached from the previous one; {@code null} means automatic. */
+    @Column(length = 16)
+    private String arrivalMode;
+
     @Version
     @Column(nullable = false)
     private Long version;

@@ -206,6 +206,8 @@ public class PlannerService {
     private void applyItem(BlockItem item, PlannerItemDto dto, int displayOrder) {
         BlockItem.BlockItemType itemType = parseItemType(dto.type());
         PlannerEnergyState.applyObservation(item, dto.type(), dto.observedSocCheckpoint());
+        LegTravelModes.applyArrivalMode(item, dto.type(), dto.arrivalMode());
+        LegTravelModes.applyPlaceType(item, dto.placeType());
         item.setClientId(dto.id());
         item.setType(itemType);
         item.setDisplayOrder(displayOrder);
@@ -362,7 +364,7 @@ public class PlannerService {
                 blocks,
                 budget,
                 trip.getVersion(),
-                trip.getUpdatedAt(), List.of("day-destinations", "charge-targets", "day-anchors", "trip-energy-v1", "observed-soc-v1", "trip-garage-v1", "canonical-optimization-v1"),
+                trip.getUpdatedAt(), List.of("day-destinations", "charge-targets", "day-anchors", "trip-energy-v1", "observed-soc-v1", "trip-garage-v1", "canonical-optimization-v1", "leg-travel-mode-v1"),
                 PlannerEnergyState.read(trip));
     }
 
@@ -444,7 +446,11 @@ public class PlannerService {
                 evCharger,
                 "note".equals(itemType) ? Objects.requireNonNullElse(item.getNotes(), "") : null,
                 "checklist".equals(itemType) ? item.getTitle() : null,
-                checklistItems, PlannerEnergyState.readObservation(item));
+                checklistItems, PlannerEnergyState.readObservation(item),
+                "place".equals(itemType) ? item.getPlaceType() : null,
+                "place".equals(itemType) && item.getArrivalMode() != null
+                        ? com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.textNode(item.getArrivalMode())
+                        : null);
     }
 
     private void validateSnapshot(PlannerSnapshotRequest request) {

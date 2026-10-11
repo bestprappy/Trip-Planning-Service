@@ -150,13 +150,14 @@ public class TripEvOptimizationService {
 
     private List<MobilityEvOptimizationRequest.Stop> routeStops(UUID tripId, ListBlock block) {
         DayAnchors anchors = resolveDayAnchors(tripId, block);
-        List<MobilityEvOptimizationRequest.Stop> stops = new ArrayList<>();
-        if (anchors.start() != null) stops.add(anchorStop(block.getClientId() + ":start", anchors.start()));
-        blockItemRepository.findByBlockIdOrderByDisplayOrder(block.getId()).stream()
+        List<BlockItem> places = blockItemRepository.findByBlockIdOrderByDisplayOrder(block.getId()).stream()
                 .filter(item -> item.getType() == BlockItem.BlockItemType.PLACE
                         || item.getType() == BlockItem.BlockItemType.EV_STATION)
-                .map(this::mapStop)
-                .forEach(stops::add);
+                .toList();
+        requireDrivingLegs(places, anchors);
+        List<MobilityEvOptimizationRequest.Stop> stops = new ArrayList<>();
+        if (anchors.start() != null) stops.add(anchorStop(block.getClientId() + ":start", anchors.start()));
+        places.stream().map(this::mapStop).forEach(stops::add);
         if (anchors.end() != null) stops.add(anchorStop(dayEndStopId(block), anchors.end()));
         if (stops.size() > MAX_ROUTE_STOPS) {
             throw new TripEvOptimizationException(
@@ -165,6 +166,25 @@ public class TripEvOptimizationService {
         }
 
         return stops;
+    }
+
+    /**
+     * The optimizer replays every leg as a road trip, so a day with a train or walking leg would
+     * be charged for driving the car does not do. Refuse it rather than plan from wrong energy.
+     * Anchors take part in legs as {@code null}: they are never stations and carry no saved mode.
+     */
+    private void requireDrivingLegs(List<BlockItem> places, DayAnchors anchors) {
+        List<BlockItem> route = new ArrayList<>();
+        if (anchors.start() != null) route.add(null);
+        route.addAll(places);
+        if (anchors.end() != null) route.add(null);
+        for (int index = 1; index < route.size(); index++) {
+            if (!LegTravelModes.DRIVE.equals(LegTravelModes.resolve(route.get(index - 1), route.get(index)))) {
+                throw new TripEvOptimizationException(
+                        "Charging stops can only be planned for days travelled by car. "
+                                + "Switch the train and walking legs on this day and earlier days to Drive to optimize");
+            }
+        }
     }
 
     /** Route id of the day's end, matching the client's route segments; chargers before it go last. */
