@@ -4,5 +4,6 @@ public enum CurrencyCode {
     THB,
     USD,
     EUR,
-    JPY
+    JPY,
+    TWD
 }
