@@ -204,6 +204,13 @@ public class PlannerService {
     }
 
     private void applyItem(BlockItem item, PlannerItemDto dto, int displayOrder) {
+        // An unchanged legacy snapshot cannot erase precision it cannot represent.
+        PlannerEvChargerDto incomingCharge = dto.evCharger();
+        boolean unchangedLegacyCharge = incomingCharge != null
+                && incomingCharge.chargingDurationMinutes() == null && incomingCharge.plannedDepartureSocPct() == null
+                && Objects.equals(item.getPlaceId(), dto.placeId())
+                && Objects.equals(item.getTargetBatteryPct(), incomingCharge.targetBatteryPct())
+                && Objects.equals(item.getEstimatedChargeMinutes(), incomingCharge.estimatedChargeMinutes());
         BlockItem.BlockItemType itemType = parseItemType(dto.type());
         PlannerEnergyState.applyObservation(item, dto.type(), dto.observedSocCheckpoint());
         LegTravelModes.applyArrivalMode(item, dto.type(), dto.arrivalMode());
@@ -241,6 +248,10 @@ public class PlannerService {
             item.setPrice(clamp(evCharger.priceText(), BlockItemTextLimits.PRICE));
             item.setOpeningHours(clamp(evCharger.openingHoursSummary(), BlockItemTextLimits.OPENING_HOURS));
             item.setEstimatedChargeMinutes(evCharger.estimatedChargeMinutes());
+            if (!unchangedLegacyCharge) {
+                item.setChargingDurationMinutes(evCharger.chargingDurationMinutes());
+                item.setPlannedDepartureSocPct(evCharger.plannedDepartureSocPct());
+            }
             item.setEvOperatorName(clamp(evCharger.operatorName(), BlockItemTextLimits.OPERATOR_NAME));
             item.setEvSelectionSource(Objects.requireNonNullElse(evCharger.selectionSource(), "MANUAL"));
             item.setEvLocked(Boolean.TRUE.equals(evCharger.locked()));
@@ -288,6 +299,8 @@ public class PlannerService {
         item.setPrice(null);
         item.setOpeningHours(null);
         item.setEstimatedChargeMinutes(null);
+        item.setChargingDurationMinutes(null);
+        item.setPlannedDepartureSocPct(null);
         item.setEvOperatorName(null);
         item.setEvSelectionSource(null);
         item.setEvLocked(false);
@@ -364,7 +377,7 @@ public class PlannerService {
                 blocks,
                 budget,
                 trip.getVersion(),
-                trip.getUpdatedAt(), List.of("day-destinations", "charge-targets", "day-anchors", "trip-energy-v1", "observed-soc-v1", "trip-garage-v1", "canonical-optimization-v1", "leg-travel-mode-v1"),
+                trip.getUpdatedAt(), List.of("day-destinations", "charge-targets", "day-anchors", "trip-energy-v1", "observed-soc-v1", "trip-garage-v1", "canonical-optimization-v1", "leg-travel-mode-v1", "precise-charging-v1"),
                 PlannerEnergyState.read(trip));
     }
 
@@ -423,7 +436,7 @@ public class PlannerService {
                         item.getEstimatedChargeMinutes(),
                         item.getEvOperatorName(),
                         Objects.requireNonNullElse(item.getEvSelectionSource(), "MANUAL"),
-                        Boolean.TRUE.equals(item.getEvLocked()), item.getTargetBatteryPct())
+                        Boolean.TRUE.equals(item.getEvLocked()), item.getTargetBatteryPct(), item.getChargingDurationMinutes(), item.getPlannedDepartureSocPct())
                 : null;
 
         return new PlannerItemDto(

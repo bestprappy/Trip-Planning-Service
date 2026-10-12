@@ -154,7 +154,7 @@ class PlanPublicationSanitizerTests {
     void publishesTheStationButNotTheChargePlanDerivedFromTheRemovedAnchor() {
         PlannerEvChargerDto charger = new PlannerEvChargerDto(
                 List.of("CCS2", "TYPE2"), 150.0, 4, 2, "8 THB/kWh", "24 hours",
-                38, "EA Anywhere", "AUTO", true, 82);
+                38, "EA Anywhere", "AUTO", true, 82, 38.125, 82.125);
         PlannerBlockDto day = itineraryDay("d1", LocalDate.of(2026, 3, 1))
                 .withStart(new PlannerAnchorDto(HOME_PLACE_ID, "SAVED_PLACE", "Home", HOME, HOME_LAT, HOME_LNG))
                 .withItems(place("i1", "PTT Station Rama II").withCharger(charger).build())
@@ -174,6 +174,8 @@ class PlanPublicationSanitizerTests {
                 .doesNotContain("82")
                 .doesNotContain("targetBatteryPct")
                 .doesNotContain("estimatedChargeMinutes")
+                .doesNotContain("chargingDurationMinutes")
+                .doesNotContain("plannedDepartureSocPct")
                 .doesNotContain("selectionSource");
     }
 

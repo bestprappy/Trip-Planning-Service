@@ -133,7 +133,9 @@ public class TripEvOptimizationService {
         }
         return new MobilityEvOptimizationRequest(request.blockId(), stops, vehicle,
                 TripOptimizationEnergy.initialSoc(trip), request.effectiveReserveSocPct(),
-                request.effectiveTargetSocPct(), request.effectiveMaximumDetourKm(), preceding);
+                request.effectiveTargetSocPct(), request.effectiveMaximumDetourKm(), preceding,
+                days.subList(targetIndex + 1, days.size()).stream()
+                        .map(day -> new MobilityEvOptimizationRequest.Day(day.getClientId(), routeStops(tripId, day))).toList());
     }
 
     private void checkVersion(Trip trip, TripEvOptimizationRequest request) {
@@ -249,7 +251,7 @@ public class TripEvOptimizationService {
                 charger == null ? null : Objects.requireNonNullElse(item.getEvSelectionSource(), "MANUAL"),
                 item.getTargetBatteryPct(),
                 item.getObservedSocPct() == null ? null : item.getObservedSocPct().doubleValue(),
-                item.getEstimatedChargeMinutes()
+                item.getEstimatedChargeMinutes(), item.getChargingDurationMinutes(), item.getPlannedDepartureSocPct()
         );
     }
 
