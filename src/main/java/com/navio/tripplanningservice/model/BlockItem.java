@@ -80,7 +80,14 @@ public class BlockItem {
     private String connectorType;     // Tesla, CCS, CHAdeMO, etc.
     private Integer availablePlugs;   // Number of available connectors
     private Double powerKw;           // Power rating in kW (e.g., 22.0)
-    private Integer estimatedChargeMinutes;  // How long to charge
+    private Integer estimatedChargeMinutes;  // Legacy whole-minute compatibility value
+    private Double chargingDurationMinutes;
+    private Double plannedDepartureSocPct;
+
+    public Double effectiveChargeMinutes() {
+        return chargingDurationMinutes != null ? chargingDurationMinutes
+                : estimatedChargeMinutes == null ? null : estimatedChargeMinutes.doubleValue();
+    }
     private Double batteryPercentage; // Why we're stopping (low battery %)
     private String price;             // Price info (e.g., "$3.50/kWh" or "Price not listed")
     private String openingHours;      // Operating hours (e.g., "24/7" or "Hours not listed")

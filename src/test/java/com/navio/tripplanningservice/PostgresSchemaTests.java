@@ -59,7 +59,7 @@ class PostgresSchemaTests {
                 }
                 var upgraded = Flyway.configure().dataSource(upgradeUrl, username, password)
                     .schemas("trip").defaultSchema("trip").load();
-                assertThat(upgraded.migrate().migrationsExecuted).isEqualTo(2);
+                assertThat(upgraded.migrate().migrationsExecuted).isEqualTo(3);
                 upgraded.validate();
                 try (var connection = java.sql.DriverManager.getConnection(upgradeUrl, username, password);
                      var sql = connection.createStatement();
@@ -90,7 +90,7 @@ class PostgresSchemaTests {
         entityManager.persist(block);
         var stop = com.navio.tripplanningservice.model.BlockItem.builder().blockId(block.getId()).clientId("stop")
             .type(com.navio.tripplanningservice.model.BlockItem.BlockItemType.PLACE).displayOrder(0).title("Stop")
-            .observedSocPct(java.math.BigDecimal.ZERO).build();
+            .observedSocPct(java.math.BigDecimal.ZERO).estimatedChargeMinutes(5).chargingDurationMinutes(5.125).plannedDepartureSocPct(68.125).build();
         entityManager.persist(stop); entityManager.flush(); entityManager.clear();
         var loaded = entityManager.find(com.navio.tripplanningservice.model.Trip.class, trip.getId());
         var loadedStop = entityManager.find(com.navio.tripplanningservice.model.BlockItem.class, stop.getId());
@@ -99,6 +99,10 @@ class PostgresSchemaTests {
         assertThat(loaded.getGarageVehicleIds()).isEqualTo(trip.getGarageVehicleIds());
         loaded.setGarageVehicleIds(java.util.List.of());
         assertThat(loadedStop.getObservedSocPct()).isEqualByComparingTo("0");
+        assertThat(loadedStop.getChargingDurationMinutes()).isEqualTo(5.125);
+        assertThat(loadedStop.getPlannedDepartureSocPct()).isEqualTo(68.125);
+        assertThat(loadedStop.getTargetBatteryPct()).isNull();
+        assertThat(loadedStop.getEstimatedChargeMinutes()).isEqualTo(5);
         loaded.setInitialSocPct(null); loaded.setEnergyVehicleSnapshot(null); loadedStop.setObservedSocPct(null);
         entityManager.flush(); entityManager.clear();
         assertThat(entityManager.find(com.navio.tripplanningservice.model.Trip.class, trip.getId()).getInitialSocPct()).isNull();

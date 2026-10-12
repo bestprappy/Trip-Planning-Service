@@ -10,8 +10,13 @@ public record MobilityEvOptimizationRequest(
         double reserveSocPct,
         double targetSocPct,
         double maximumDetourKm,
-        List<Day> precedingDays
+        List<Day> precedingDays,
+        List<Day> followingDays
 ) {
+    public MobilityEvOptimizationRequest(String blockId, List<Stop> stops, Vehicle vehicle, double startingSocPct,
+            double reserveSocPct, double targetSocPct, double maximumDetourKm, List<Day> precedingDays) {
+        this(blockId, stops, vehicle, startingSocPct, reserveSocPct, targetSocPct, maximumDetourKm, precedingDays, List.of());
+    }
     public MobilityEvOptimizationRequest(String blockId, List<Stop> stops, Vehicle vehicle, double startingSocPct,
                                          double reserveSocPct, double targetSocPct, double maximumDetourKm) {
         this(blockId, stops, vehicle, startingSocPct, reserveSocPct, targetSocPct, maximumDetourKm, List.of());
@@ -19,6 +24,7 @@ public record MobilityEvOptimizationRequest(
     public MobilityEvOptimizationRequest {
         stops = List.copyOf(stops);
         precedingDays = List.copyOf(precedingDays);
+        followingDays = List.copyOf(followingDays);
     }
 
     public record Day(String blockId, List<Stop> stops) {
@@ -35,8 +41,13 @@ public record MobilityEvOptimizationRequest(
             String selectionSource,
             Integer targetBatteryPct,
             Double observedSocPct,
-            Integer estimatedChargeMinutes
+            Integer estimatedChargeMinutes,
+            Double chargingDurationMinutes,
+            Double plannedDepartureSocPct
     ) {
+        public Stop(String itemId, String name, double lat, double lng, MobilityEvCharger charger, boolean locked, String selectionSource, Integer targetBatteryPct, Double observedSocPct, Integer estimatedChargeMinutes) {
+            this(itemId, name, lat, lng, charger, locked, selectionSource, targetBatteryPct, observedSocPct, estimatedChargeMinutes, null, null);
+        }
         public Stop(String itemId, String name, double lat, double lng, MobilityEvCharger charger, boolean locked, String selectionSource, Integer targetBatteryPct, Double observedSocPct) {
             this(itemId, name, lat, lng, charger, locked, selectionSource, targetBatteryPct, observedSocPct, null);
         }

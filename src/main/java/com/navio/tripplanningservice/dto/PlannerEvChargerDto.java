@@ -17,8 +17,16 @@ public record PlannerEvChargerDto(
         String operatorName,
         @Pattern(regexp = "AUTO|MANUAL") String selectionSource,
         Boolean locked,
-        @jakarta.validation.constraints.Min(0) @jakarta.validation.constraints.Max(100) Integer targetBatteryPct
+        @jakarta.validation.constraints.Min(0) @jakarta.validation.constraints.Max(100) Integer targetBatteryPct,
+        @jakarta.validation.constraints.DecimalMin("0.0") @jakarta.validation.constraints.DecimalMax("2147483647.0") Double chargingDurationMinutes,
+        @jakarta.validation.constraints.DecimalMin("0.0") @jakarta.validation.constraints.DecimalMax("100.0") Double plannedDepartureSocPct
 ) {
+    public PlannerEvChargerDto(List<String> connectorTypes, Double maxKw, Integer totalConnectors,
+            Integer availableConnectors, String priceText, String openingHoursSummary,
+            Integer estimatedChargeMinutes, String operatorName, String selectionSource, Boolean locked, Integer targetBatteryPct) {
+        this(connectorTypes, maxKw, totalConnectors, availableConnectors, priceText, openingHoursSummary,
+                estimatedChargeMinutes, operatorName, selectionSource, locked, targetBatteryPct, null, null);
+    }
     public PlannerEvChargerDto(List<String> connectorTypes, Double maxKw, Integer totalConnectors,
             Integer availableConnectors, String priceText, String openingHoursSummary,
             Integer estimatedChargeMinutes, String operatorName, String selectionSource, Boolean locked) {
