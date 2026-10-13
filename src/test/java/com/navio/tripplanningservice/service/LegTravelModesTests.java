@@ -66,6 +66,16 @@ class LegTravelModesTests {
     }
 
     @Test
+    void savesAndResolvesABikeJourneyWithoutTreatingItAsDriving() {
+        BlockItem item = typed("museum");
+        LegTravelModes.applyArrivalMode(item, "place", JSON.textNode("bike"));
+        assertThat(item.getArrivalMode()).isEqualTo("bike");
+        assertThat(LegTravelModes.resolve(typed("park"), item)).isEqualTo("bike");
+        LegTravelModes.applyArrivalMode(item, "place", null);
+        assertThat(item.getArrivalMode()).isEqualTo("bike");
+    }
+
+    @Test
     void rejectsAnUnknownTravelMode() {
         assertThatThrownBy(() -> LegTravelModes.applyArrivalMode(new BlockItem(), "place", JSON.textNode("teleport")))
                 .isInstanceOf(PlannerValidationException.class);
@@ -85,6 +95,46 @@ class LegTravelModesTests {
         LegTravelModes.applyPlaceType(item, null);
 
         assertThat(item.getPlaceType()).isEqualTo("subway_station");
+    }
+
+    @Test
+    void preservesRailAndBusPreferencesBetweenAnAirportAndHotel() {
+        for (String mode : new String[] {"rail", "bus"}) {
+            BlockItem hotel = typed("lodging");
+            LegTravelModes.applyArrivalMode(hotel, "place", JSON.textNode(mode));
+            assertThat(hotel.getArrivalMode()).isEqualTo(mode);
+            assertThat(LegTravelModes.resolve(typed("airport"), hotel)).isEqualTo(mode);
+            LegTravelModes.applyArrivalMode(hotel, "place", null);
+            assertThat(hotel.getArrivalMode()).isEqualTo(mode);
+        }
+    }
+
+    @Test
+    void selectedRouteSurvivesOmissionAndClearsOnModeChangeOrExplicitNull() {
+        BlockItem item = typed("lodging");
+        LegTravelModes.applyArrivalMode(item, "place", JSON.textNode("rail"));
+        String key = "v1:[[\"SUBWAY\",\"Airport Line\",null,\"Terminal 2\",\"Taipei Main\"]]";
+        LegTravelModes.applyArrivalRouteKey(item, "place", JSON.textNode(key));
+        LegTravelModes.applyArrivalRouteKey(item, "place", null);
+        assertThat(item.getArrivalRouteKey()).isEqualTo(key);
+        LegTravelModes.applyArrivalRouteKey(item, "place", JSON.nullNode());
+        assertThat(item.getArrivalRouteKey()).isNull();
+        LegTravelModes.applyArrivalRouteKey(item, "place", JSON.textNode(key));
+        LegTravelModes.applyArrivalMode(item, "place", JSON.textNode("walk"));
+        assertThat(item.getArrivalRouteKey()).isNull();
+    }
+
+    @Test
+    void rejectsMalformedOrNonTransitRouteChoices() {
+        BlockItem item = typed("lodging");
+        item.setArrivalMode("rail");
+        for (String key : new String[] {"plain", "v1:{}", "v1:[]", "v1:[[true]]", "v1:" + "x".repeat(4096)}) {
+            assertThatThrownBy(() -> LegTravelModes.applyArrivalRouteKey(item, "place", JSON.textNode(key)))
+                .isInstanceOf(PlannerValidationException.class);
+        }
+        item.setArrivalMode("drive");
+        assertThatThrownBy(() -> LegTravelModes.applyArrivalRouteKey(item, "place", JSON.textNode("v1:[[null,null,null,\"A\",\"B\"]]")))
+            .isInstanceOf(PlannerValidationException.class);
     }
 
     private static BlockItem typed(String placeType) {

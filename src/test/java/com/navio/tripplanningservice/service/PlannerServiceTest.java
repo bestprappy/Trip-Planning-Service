@@ -397,6 +397,37 @@ class PlannerServiceTest {
         verify(listBlockRepository, never()).save(any());
     }
 
+    @Test
+    void roundTripsTheChosenTransitLineSequenceAndAdvertisesTheCapability() {
+        Trip trip = ownedTrip(1L);
+        when(tripRepository.findByIdAndUserId(TRIP_ID, USER_ID)).thenReturn(Optional.of(trip));
+        when(listBlockRepository.findByTripIdOrderByDisplayOrder(TRIP_ID)).thenReturn(List.of());
+        when(blockItemRepository.findByBlockIdOrderByDisplayOrder(BLOCK_ID)).thenReturn(List.of());
+        when(listBlockRepository.save(any(ListBlock.class))).thenAnswer(call -> {
+            ListBlock block = call.getArgument(0); block.setId(BLOCK_ID); return block;
+        });
+        when(blockItemRepository.save(any(BlockItem.class))).thenAnswer(call -> {
+            BlockItem item = call.getArgument(0); item.setId(ITEM_ID); return item;
+        });
+        when(tripRepository.saveAndFlush(trip)).thenReturn(trip);
+        String key = "v1:[[\"SUBWAY\",\"Airport Line\",null,\"Terminal 2\",\"Taipei Main\"]]";
+        var json = com.fasterxml.jackson.databind.node.JsonNodeFactory.instance;
+        var place = new PlannerItemDto("hotel", "place", "GOOGLE:hotel", "Hotel", null, "Taipei", 25.042, 121.507,
+                null, null, null, null, false, null, null, null, null, null, null, null, null,
+                "lodging", json.textNode("rail"), json.textNode(key));
+        var day = new PlannerBlockDto("day", "itinerary", "Day 1", LocalDate.of(2026, 10, 13), "pink", List.of(place), null);
+        plannerService.savePlannerSnapshot(TRIP_ID, USER_ID, new PlannerSnapshotRequest(1L, List.of(day)));
+        var block = ArgumentCaptor.forClass(ListBlock.class);
+        var item = ArgumentCaptor.forClass(BlockItem.class);
+        verify(listBlockRepository).save(block.capture()); verify(blockItemRepository).save(item.capture());
+        assertEquals(key, item.getValue().getArrivalRouteKey());
+        when(listBlockRepository.findByTripIdOrderByDisplayOrder(TRIP_ID)).thenReturn(List.of(block.getValue()));
+        when(blockItemRepository.findByBlockIdOrderByDisplayOrder(BLOCK_ID)).thenReturn(List.of(item.getValue()));
+        var snapshot = plannerService.getPlannerSnapshot(TRIP_ID, USER_ID);
+        assertEquals(key, snapshot.blocks().getFirst().items().getFirst().arrivalRouteKey().asText());
+        org.assertj.core.api.Assertions.assertThat(snapshot.capabilities()).contains("transit-route-choice-v1");
+    }
+
     private PlannerBlockDto anchoredBlock(PlannerAnchorDto start, PlannerAnchorDto end) {
         return new PlannerBlockDto("block-day-1", "itinerary", "Day 1",
                 LocalDate.of(2026, 9, 1), "amber", List.of(), null, start, end);

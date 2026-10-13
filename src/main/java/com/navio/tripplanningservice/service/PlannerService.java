@@ -214,6 +214,7 @@ public class PlannerService {
         BlockItem.BlockItemType itemType = parseItemType(dto.type());
         PlannerEnergyState.applyObservation(item, dto.type(), dto.observedSocCheckpoint());
         LegTravelModes.applyArrivalMode(item, dto.type(), dto.arrivalMode());
+        LegTravelModes.applyArrivalRouteKey(item, dto.type(), dto.arrivalRouteKey());
         LegTravelModes.applyPlaceType(item, dto.placeType());
         item.setClientId(dto.id());
         item.setType(itemType);
@@ -377,7 +378,7 @@ public class PlannerService {
                 blocks,
                 budget,
                 trip.getVersion(),
-                trip.getUpdatedAt(), List.of("day-destinations", "charge-targets", "day-anchors", "trip-energy-v1", "observed-soc-v1", "trip-garage-v1", "canonical-optimization-v1", "leg-travel-mode-v1", "precise-charging-v1"),
+                trip.getUpdatedAt(), List.of("day-destinations", "charge-targets", "day-anchors", "trip-energy-v1", "observed-soc-v1", "trip-garage-v1", "canonical-optimization-v1", "leg-travel-mode-v1", "cycling-legs-v1", "transit-preferences-v1", "transit-route-choice-v1", "precise-charging-v1"),
                 PlannerEnergyState.read(trip));
     }
 
@@ -463,7 +464,9 @@ public class PlannerService {
                 "place".equals(itemType) ? item.getPlaceType() : null,
                 "place".equals(itemType) && item.getArrivalMode() != null
                         ? com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.textNode(item.getArrivalMode())
-                        : null);
+                        : null,
+                "place".equals(itemType) && item.getArrivalRouteKey() != null
+                        ? com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.textNode(item.getArrivalRouteKey()) : null);
     }
 
     private void validateSnapshot(PlannerSnapshotRequest request) {

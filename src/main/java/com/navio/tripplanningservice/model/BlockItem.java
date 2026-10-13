@@ -119,6 +119,10 @@ public class BlockItem {
     @Column(length = 16)
     private String arrivalMode;
 
+    /** Stable chosen transit line/station sequence, without storing schedules or map data. */
+    @Column(columnDefinition = "text")
+    private String arrivalRouteKey;
+
     @Version
     @Column(nullable = false)
     private Long version;

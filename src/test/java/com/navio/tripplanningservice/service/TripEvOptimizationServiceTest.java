@@ -150,6 +150,20 @@ class TripEvOptimizationServiceTest {
     }
 
     @Test
+    void refusesToOptimizeABikeLegAsThoughTheCarTravelledIt() {
+        BlockItem start = place("start", "Park", 13.6, 99.9);
+        BlockItem arrival = place("arrival", "Museum", 13.7, 100.0);
+        arrival.setArrivalMode("bike");
+        AnchorFixture fixture = anchorFixture(
+                List.of(day("day-1", LocalDate.of(2026, 9, 22), "Home", "Hotel")),
+                List.of(start, arrival));
+        assertThatThrownBy(() -> fixture.service.preview(fixture.tripId, fixture.userId, request(null)))
+                .isInstanceOf(TripEvOptimizationException.class)
+                .hasMessageContaining("travelled by car");
+        verifyNoInteractions(fixture.mobilityClient);
+    }
+
+    @Test
     void optimizesAStationToStationDayOnceTheTravellerSwitchesItToDriving() {
         BlockItem airport = place("airport", "Airport Terminal 2", 25.07, 121.23);
         airport.setPlaceType("subway_station");

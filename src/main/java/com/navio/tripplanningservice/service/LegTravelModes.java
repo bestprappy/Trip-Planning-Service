@@ -20,8 +20,11 @@ final class LegTravelModes {
     static final String DRIVE = "drive";
     static final String TRANSIT = "transit";
     static final String WALK = "walk";
+    static final String BIKE = "bike";
+    static final String RAIL = "rail";
+    static final String BUS = "bus";
 
-    private static final Set<String> MODES = Set.of(DRIVE, TRANSIT, WALK);
+    private static final Set<String> MODES = Set.of(DRIVE, TRANSIT, RAIL, BUS, BIKE, WALK);
 
     /** Google Places primary types of stops a public transit route can start or end at. */
     private static final Set<String> STATION_TYPES = Set.of(
@@ -47,12 +50,37 @@ final class LegTravelModes {
         }
         if (requested.isNull()) {
             item.setArrivalMode(null);
+            item.setArrivalRouteKey(null);
             return;
         }
         if (!"place".equals(itemType) || !requested.isTextual() || !MODES.contains(requested.asText())) {
-            throw new PlannerValidationException("A stop's travel mode must be drive, transit or walk");
+            throw new PlannerValidationException("A stop's travel mode must be drive, transit, rail, bus, bike or walk");
         }
+        if (!java.util.Objects.equals(item.getArrivalMode(), requested.asText())) item.setArrivalRouteKey(null);
         item.setArrivalMode(requested.asText());
+    }
+
+    static void applyArrivalRouteKey(BlockItem item, String itemType, JsonNode requested) {
+        if (requested == null) return;
+        if (requested.isNull()) { item.setArrivalRouteKey(null); return; }
+        if (!"place".equals(itemType) || !Set.of(TRANSIT, RAIL, BUS).contains(java.util.Objects.requireNonNullElse(item.getArrivalMode(), ""))
+                || !requested.isTextual() || !isValidRouteKey(requested.asText())) {
+            throw new PlannerValidationException("A selected transit route must have a valid line and station sequence on a transit place");
+        }
+        item.setArrivalRouteKey(requested.asText());
+    }
+
+    private static boolean isValidRouteKey(String value) {
+        if (value.length() > 4096 || !value.startsWith("v1:")) return false;
+        try {
+            JsonNode rides = new com.fasterxml.jackson.databind.ObjectMapper().readTree(value.substring(3));
+            if (rides == null || !rides.isArray() || rides.isEmpty() || rides.size() > 16) return false;
+            for (JsonNode ride : rides) {
+                if (!ride.isArray() || ride.size() != 5) return false;
+                for (JsonNode field : ride) if (!field.isNull() && (!field.isTextual() || field.asText().length() > 200)) return false;
+            }
+            return true;
+        } catch (java.io.IOException exception) { return false; }
     }
 
     /** Keeps a provider type only when it is a plain identifier; a stop never loses a known type. */
