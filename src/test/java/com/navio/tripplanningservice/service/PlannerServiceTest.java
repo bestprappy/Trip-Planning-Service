@@ -428,6 +428,66 @@ class PlannerServiceTest {
         org.assertj.core.api.Assertions.assertThat(snapshot.capabilities()).contains("transit-route-choice-v1");
     }
 
+    @Test
+    void roundTripsACalculatedTimeAndAdvertisesTheCapability() {
+        Trip trip = ownedTrip(1L);
+        when(tripRepository.findByIdAndUserId(TRIP_ID, USER_ID)).thenReturn(Optional.of(trip));
+        when(listBlockRepository.findByTripIdOrderByDisplayOrder(TRIP_ID)).thenReturn(List.of());
+        when(blockItemRepository.findByBlockIdOrderByDisplayOrder(BLOCK_ID)).thenReturn(List.of());
+        when(listBlockRepository.save(any(ListBlock.class))).thenAnswer(call -> {
+            ListBlock block = call.getArgument(0); block.setId(BLOCK_ID); return block;
+        });
+        when(blockItemRepository.save(any(BlockItem.class))).thenAnswer(call -> {
+            BlockItem item = call.getArgument(0); item.setId(ITEM_ID); return item;
+        });
+        when(tripRepository.saveAndFlush(trip)).thenReturn(trip);
+        var place = new PlannerItemDto("museum", "place", "GOOGLE:museum", "Museum", null, "Taipei", 25.042, 121.507,
+                null, null, null, null, false, "10:15", "11:15", null, null, null, null, null, null,
+                "museum", null, null, "calculated");
+        var day = new PlannerBlockDto("day", "itinerary", "Day 1", LocalDate.of(2026, 10, 14), "pink", List.of(place), null);
+        plannerService.savePlannerSnapshot(TRIP_ID, USER_ID, new PlannerSnapshotRequest(1L, List.of(day)));
+        var block = ArgumentCaptor.forClass(ListBlock.class);
+        var item = ArgumentCaptor.forClass(BlockItem.class);
+        verify(listBlockRepository).save(block.capture()); verify(blockItemRepository).save(item.capture());
+        assertEquals("calculated", item.getValue().getTimeSource());
+        when(listBlockRepository.findByTripIdOrderByDisplayOrder(TRIP_ID)).thenReturn(List.of(block.getValue()));
+        when(blockItemRepository.findByBlockIdOrderByDisplayOrder(BLOCK_ID)).thenReturn(List.of(item.getValue()));
+        var snapshot = plannerService.getPlannerSnapshot(TRIP_ID, USER_ID);
+        var loaded = snapshot.blocks().getFirst().items().getFirst();
+        assertEquals("10:15", loaded.time());
+        assertEquals("calculated", loaded.timeSource());
+        org.assertj.core.api.Assertions.assertThat(snapshot.capabilities()).contains("time-source-v1");
+    }
+
+    @Test
+    void roundTripsAStopsScheduleAndAdvertisesTheCapability() {
+        Trip trip = ownedTrip(1L);
+        when(tripRepository.findByIdAndUserId(TRIP_ID, USER_ID)).thenReturn(Optional.of(trip));
+        when(listBlockRepository.findByTripIdOrderByDisplayOrder(TRIP_ID)).thenReturn(List.of());
+        when(blockItemRepository.findByBlockIdOrderByDisplayOrder(BLOCK_ID)).thenReturn(List.of());
+        when(listBlockRepository.save(any(ListBlock.class))).thenAnswer(call -> {
+            ListBlock block = call.getArgument(0); block.setId(BLOCK_ID); return block;
+        });
+        when(blockItemRepository.save(any(BlockItem.class))).thenAnswer(call -> {
+            BlockItem item = call.getArgument(0); item.setId(ITEM_ID); return item;
+        });
+        when(tripRepository.saveAndFlush(trip)).thenReturn(trip);
+        var checkIn = new com.navio.tripplanningservice.dto.PlannerScheduleEntryDto("s1", "09:00", "09:10", "Check in");
+        var place = new PlannerItemDto("hotel", "place", "GOOGLE:hotel", "Hotel", null, "Taipei", 25.042, 121.507,
+                null, null, null, null, false, "09:00", "10:20", null, null, null, null, null, null,
+                "lodging", null, null, "fixed", List.of(checkIn));
+        var day = new PlannerBlockDto("day", "itinerary", "Day 1", LocalDate.of(2026, 10, 14), "pink", List.of(place), null);
+        plannerService.savePlannerSnapshot(TRIP_ID, USER_ID, new PlannerSnapshotRequest(1L, List.of(day)));
+        var block = ArgumentCaptor.forClass(ListBlock.class);
+        var item = ArgumentCaptor.forClass(BlockItem.class);
+        verify(listBlockRepository).save(block.capture()); verify(blockItemRepository).save(item.capture());
+        when(listBlockRepository.findByTripIdOrderByDisplayOrder(TRIP_ID)).thenReturn(List.of(block.getValue()));
+        when(blockItemRepository.findByBlockIdOrderByDisplayOrder(BLOCK_ID)).thenReturn(List.of(item.getValue()));
+        var snapshot = plannerService.getPlannerSnapshot(TRIP_ID, USER_ID);
+        assertEquals(List.of(checkIn), snapshot.blocks().getFirst().items().getFirst().schedule());
+        org.assertj.core.api.Assertions.assertThat(snapshot.capabilities()).contains("item-schedule-v1");
+    }
+
     private PlannerBlockDto anchoredBlock(PlannerAnchorDto start, PlannerAnchorDto end) {
         return new PlannerBlockDto("block-day-1", "itinerary", "Day 1",
                 LocalDate.of(2026, 9, 1), "amber", List.of(), null, start, end);

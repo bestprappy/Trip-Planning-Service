@@ -123,6 +123,14 @@ public class BlockItem {
     @Column(columnDefinition = "text")
     private String arrivalRouteKey;
 
+    /** {@code fixed} when the traveller set the time, {@code calculated} when Calculate times did; {@code null} is unknown. */
+    @Column(length = 16)
+    private String timeSource;
+
+    /** The traveller's own timetable inside this stop, as a JSON array; {@code null} when there is none. */
+    @Column(columnDefinition = "text")
+    private String schedule;
+
     @Version
     @Column(nullable = false)
     private Long version;

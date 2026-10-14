@@ -232,8 +232,12 @@ public class PlannerService {
         item.setPlaceReviewCount(dto.reviewCount());
         item.setPlaceImageUrl(dto.imageUrl());
         item.setVisited(Boolean.TRUE.equals(dto.isVisited()));
-        item.setStartTime(parseTime(dto.time(), "time"));
-        item.setEndTime(parseTime(dto.timeEnd(), "timeEnd"));
+        LocalTime startTime = parseTime(dto.time(), "time");
+        LocalTime endTime = parseTime(dto.timeEnd(), "timeEnd");
+        item.setTimeSource(ItemTimeSources.resolve(item, dto.type(), dto.timeSource(), startTime, endTime));
+        item.setStartTime(startTime);
+        item.setEndTime(endTime);
+        ItemSchedules.apply(item, dto.type(), dto.schedule());
         item.setEstimatedCost(toMoney(dto.cost()));
 
         PlannerEvChargerDto evCharger = dto.evCharger();
@@ -378,7 +382,7 @@ public class PlannerService {
                 blocks,
                 budget,
                 trip.getVersion(),
-                trip.getUpdatedAt(), List.of("day-destinations", "charge-targets", "day-anchors", "trip-energy-v1", "observed-soc-v1", "trip-garage-v1", "canonical-optimization-v1", "leg-travel-mode-v1", "cycling-legs-v1", "transit-preferences-v1", "transit-route-choice-v1", "precise-charging-v1"),
+                trip.getUpdatedAt(), List.of("day-destinations", "charge-targets", "day-anchors", "trip-energy-v1", "observed-soc-v1", "trip-garage-v1", "canonical-optimization-v1", "leg-travel-mode-v1", "cycling-legs-v1", "transit-preferences-v1", "transit-route-choice-v1", "precise-charging-v1", "time-source-v1", "item-schedule-v1"),
                 PlannerEnergyState.read(trip));
     }
 
@@ -466,7 +470,9 @@ public class PlannerService {
                         ? com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.textNode(item.getArrivalMode())
                         : null,
                 "place".equals(itemType) && item.getArrivalRouteKey() != null
-                        ? com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.textNode(item.getArrivalRouteKey()) : null);
+                        ? com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.textNode(item.getArrivalRouteKey()) : null,
+                "place".equals(itemType) ? item.getTimeSource() : null,
+                "place".equals(itemType) ? ItemSchedules.read(item) : null);
     }
 
     private void validateSnapshot(PlannerSnapshotRequest request) {
