@@ -81,7 +81,10 @@ public class PlannerService {
         Timer.Sample sample = Timer.start(meterRegistry);
         String outcome = "success";
         try {
-            Trip trip = requireOwnedTrip(tripId, userId);
+            // Match narrow append's lock order: trip first, then blocks/items. This also
+            // ensures a stale snapshot cannot start mutating children after an append.
+            Trip trip = tripRepository.findOwnedForUpdate(tripId, userId)
+                    .orElseThrow(() -> new TripService.TripNotFoundException(tripId));
             validateSnapshot(request);
             if (!Objects.equals(request.version(), trip.getVersion())) {
                 throw new ObjectOptimisticLockingFailureException(Trip.class, tripId);
@@ -400,7 +403,7 @@ public class PlannerService {
                 kind,
                 block.getName(),
                 block.getBlockDate(),
-                block.getBlockColor(),
+                Objects.requireNonNullElse(block.getBlockColor(), "teal"),
                 items,
                 block.getDestinationId() == null ? null : new PlannerDestinationDto(
                         block.getDestinationId(), block.getDestinationName(),
@@ -450,7 +453,7 @@ public class PlannerService {
                 item.getPlaceId(),
                 item.getPlaceName(),
                 item.getPlaceDescription(),
-                item.getPlaceAddress(),
+                "place".equals(itemType) ? Objects.requireNonNullElse(item.getPlaceAddress(), "") : item.getPlaceAddress(),
                 item.getPlaceLat(),
                 item.getPlaceLng(),
                 item.getPlaceRating(),
