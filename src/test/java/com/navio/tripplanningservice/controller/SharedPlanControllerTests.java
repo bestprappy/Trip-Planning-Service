@@ -8,6 +8,7 @@ import com.navio.tripplanningservice.dto.publication.PublicPlanSnapshot;
 import com.navio.tripplanningservice.dto.publication.PublicationOptions;
 import com.navio.tripplanningservice.dto.publication.SharedPlanResponse;
 import com.navio.tripplanningservice.service.publication.PlanPublicationSanitizer;
+import com.navio.tripplanningservice.service.publication.SharedPlanSummaryService;
 import com.navio.tripplanningservice.service.publication.TripPublicationService;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -46,6 +47,9 @@ class SharedPlanControllerTests {
 
     @MockitoBean
     private TripPublicationService publicationService;
+
+    @MockitoBean
+    private SharedPlanSummaryService summaryService;
 
     @Test
     void servesAPublishedPlanToACallerWithNoIdentityAtAll() throws Exception {
@@ -127,6 +131,36 @@ class SharedPlanControllerTests {
                 "Songkran road trip", "Bangkok", "Thailand",
                 null, null, 1, List.of(day), null, PublicationOptions.none());
         return new SharedPlanResponse(plan, Instant.parse("2026-09-20T10:00:00Z"), false, "Kanya S.");
+    }
+
+    // ------------------------------------------------------------ card lookup
+
+    @Test
+    void servesOneListedPlansCardWithoutOpeningThePlan() throws Exception {
+        when(summaryService.summarizeListedPlan(TOKEN)).thenReturn(new ExplorePlanSummary(
+                TOKEN, "Songkran road trip", "Kanya S.", "Bangkok", "Thailand", 2, 3, 1, null,
+                List.of("Wat Arun"),
+                List.of(new ExplorePlanSummary.ExploreDayShape(List.of("place", "charger"))),
+                Instant.parse("2026-09-20T10:00:00Z"), null));
+
+        mockMvc.perform(get("/v1/shared-plans/{token}/summary", TOKEN))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", org.hamcrest.Matchers.containsString("no-store")))
+                .andExpect(jsonPath("$.token").value(TOKEN))
+                .andExpect(jsonPath("$.title").value("Songkran road trip"))
+                .andExpect(jsonPath("$.chargerCount").value(1));
+        verify(publicationService, org.mockito.Mockito.never()).readSharedPlan(any());
+    }
+
+    @Test
+    void answersAnUnlistedCardLookupWithTheSameNotFoundAsADeadLink() throws Exception {
+        when(summaryService.summarizeListedPlan(TOKEN))
+                .thenThrow(new TripPublicationService.SharedPlanUnavailableException());
+
+        mockMvc.perform(get("/v1/shared-plans/{token}/summary", TOKEN))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status").value(404))
+                .andExpect(jsonPath("$.message").value("This shared plan is no longer available"));
     }
 
     // ------------------------------------------------------------ explore feed
