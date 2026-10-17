@@ -34,8 +34,28 @@ public record PlannerItemDto(
         // Omitted keeps the saved mode, JSON null resets it to automatic.
         com.fasterxml.jackson.databind.JsonNode arrivalMode,
         // Omitted preserves the selection; JSON null clears it.
-        com.fasterxml.jackson.databind.JsonNode arrivalRouteKey
+        com.fasterxml.jackson.databind.JsonNode arrivalRouteKey,
+        // "fixed" or "calculated"; omitted keeps the saved source only while the times are unchanged.
+        @Size(max = 16) String timeSource,
+        // Moments inside the stop; omitted keeps the saved schedule, an empty list clears it.
+        @Size(max = 40) List<@Valid PlannerScheduleEntryDto> schedule
 ) {
+    public PlannerItemDto(String id, String type, String placeId, String name, String description, String address,
+        Double lat, Double lng, Double rating, Integer reviewCount, String imageUrl, String notes, Boolean isVisited,
+        String time, String timeEnd, Double cost, PlannerEvChargerDto evCharger, String content, String title,
+        List<PlannerChecklistSubItemDto> items, com.fasterxml.jackson.databind.JsonNode observedSocCheckpoint,
+        String placeType, com.fasterxml.jackson.databind.JsonNode arrivalMode,
+        com.fasterxml.jackson.databind.JsonNode arrivalRouteKey, String timeSource) {
+        this(id,type,placeId,name,description,address,lat,lng,rating,reviewCount,imageUrl,notes,isVisited,time,timeEnd,cost,evCharger,content,title,items,observedSocCheckpoint,placeType,arrivalMode,arrivalRouteKey,timeSource,null);
+    }
+    public PlannerItemDto(String id, String type, String placeId, String name, String description, String address,
+        Double lat, Double lng, Double rating, Integer reviewCount, String imageUrl, String notes, Boolean isVisited,
+        String time, String timeEnd, Double cost, PlannerEvChargerDto evCharger, String content, String title,
+        List<PlannerChecklistSubItemDto> items, com.fasterxml.jackson.databind.JsonNode observedSocCheckpoint,
+        String placeType, com.fasterxml.jackson.databind.JsonNode arrivalMode,
+        com.fasterxml.jackson.databind.JsonNode arrivalRouteKey) {
+        this(id,type,placeId,name,description,address,lat,lng,rating,reviewCount,imageUrl,notes,isVisited,time,timeEnd,cost,evCharger,content,title,items,observedSocCheckpoint,placeType,arrivalMode,arrivalRouteKey,null);
+    }
     public PlannerItemDto(String id, String type, String placeId, String name, String description, String address,
         Double lat, Double lng, Double rating, Integer reviewCount, String imageUrl, String notes, Boolean isVisited,
         String time, String timeEnd, Double cost, PlannerEvChargerDto evCharger, String content, String title,

@@ -3,6 +3,7 @@ package com.navio.tripplanningservice.controller;
 import com.navio.tripplanningservice.dto.publication.ExplorePlanSummary;
 import com.navio.tripplanningservice.dto.publication.SharedPlanResponse;
 import com.navio.tripplanningservice.dto.TripResponse;
+import com.navio.tripplanningservice.service.publication.SharedPlanSummaryService;
 import com.navio.tripplanningservice.service.publication.TripPublicationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -43,6 +44,7 @@ public class SharedPlanController {
     static final int MAX_PAGE_SIZE = 48;
 
     private final TripPublicationService publicationService;
+    private final SharedPlanSummaryService summaryService;
 
     /**
      * The Explore feed. Short {@code no-store} for the same reason as a single
@@ -74,6 +76,18 @@ public class SharedPlanController {
                 .header("X-Robots-Tag", "noindex, nofollow, noarchive")
                 .header("Referrer-Policy", "no-referrer")
                 .body(response);
+    }
+
+    /**
+     * The Explore card for one listed plan, so a page that references the plan
+     * (a community post) can show it without opening it. Unlisted, revoked and
+     * unknown tokens all answer the same {@code 404}.
+     */
+    @GetMapping("/{token}/summary")
+    public ResponseEntity<ExplorePlanSummary> getSharedPlanSummary(@PathVariable String token) {
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .body(summaryService.summarizeListedPlan(token));
     }
 
     /** Authenticated copy of a listed, still published plan into the caller's account. */

@@ -60,8 +60,8 @@ class PostgresSchemaTests {
                 var upgraded = Flyway.configure().dataSource(upgradeUrl, username, password)
                     .schemas("trip").defaultSchema("trip").load();
                 // V14 energy state, V15 garage membership, V16 stop arrival mode,
-                // V17 precise charging plan and V18 transit route choice.
-                assertThat(upgraded.migrate().migrationsExecuted).isEqualTo(5);
+                // V17 precise charging plan, V18 transit route choice, V19 time source and V20 stop schedule.
+                assertThat(upgraded.migrate().migrationsExecuted).isEqualTo(7);
                 upgraded.validate();
                 try (var connection = java.sql.DriverManager.getConnection(upgradeUrl, username, password);
                      var sql = connection.createStatement();
@@ -93,7 +93,9 @@ class PostgresSchemaTests {
         var stop = com.navio.tripplanningservice.model.BlockItem.builder().blockId(block.getId()).clientId("stop")
             .type(com.navio.tripplanningservice.model.BlockItem.BlockItemType.PLACE).displayOrder(0).title("Stop")
             .observedSocPct(java.math.BigDecimal.ZERO).placeType("subway_station").arrivalMode("rail").arrivalRouteKey("v1:[[\"SUBWAY\",\"Airport Line\",null,\"Terminal 2\",\"Taipei Main\"]]")
-            .estimatedChargeMinutes(5).chargingDurationMinutes(5.125).plannedDepartureSocPct(68.125).build();
+            .estimatedChargeMinutes(5).chargingDurationMinutes(5.125).plannedDepartureSocPct(68.125)
+            .startTime(java.time.LocalTime.of(9, 0)).timeSource("calculated")
+            .schedule("[{\"id\":\"s1\",\"time\":\"09:00\",\"label\":\"Check in\"}]").build();
         entityManager.persist(stop); entityManager.flush(); entityManager.clear();
         var loaded = entityManager.find(com.navio.tripplanningservice.model.Trip.class, trip.getId());
         var loadedStop = entityManager.find(com.navio.tripplanningservice.model.BlockItem.class, stop.getId());
@@ -106,6 +108,8 @@ class PostgresSchemaTests {
         assertThat(loadedStop.getArrivalMode()).isEqualTo("rail");
         assertThat(loadedStop.getArrivalRouteKey()).isEqualTo(stop.getArrivalRouteKey());
         loadedStop.setArrivalRouteKey(null);
+        assertThat(loadedStop.getTimeSource()).isEqualTo("calculated");
+        assertThat(loadedStop.getSchedule()).isEqualTo(stop.getSchedule());
         assertThat(loadedStop.getChargingDurationMinutes()).isEqualTo(5.125);
         assertThat(loadedStop.getPlannedDepartureSocPct()).isEqualTo(68.125);
         assertThat(loadedStop.getTargetBatteryPct()).isNull();

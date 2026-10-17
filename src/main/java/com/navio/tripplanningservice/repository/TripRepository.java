@@ -25,6 +25,10 @@ public interface TripRepository extends JpaRepository<Trip, UUID> {
 
     Optional<Trip> findByIdAndUserId(UUID id, UUID userId);
 
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @org.springframework.data.jpa.repository.Query("select t from Trip t where t.id = :id and t.userId = :userId")
+    Optional<Trip> findOwnedForUpdate(UUID id, UUID userId);
+
     // Scalar read bypasses an already-loaded Trip in the persistence context.
     @org.springframework.data.jpa.repository.Query("select t.version from Trip t where t.id = :id and t.userId = :userId")
     Optional<Long> findCurrentVersion(UUID id, UUID userId);

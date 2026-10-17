@@ -86,6 +86,27 @@ class PlannerServiceTest {
     }
 
     @Test
+    void readsPreviouslyAppendedPlacesWithRequiredDisplayDefaultsWithoutWritingData() {
+        Trip trip = ownedTrip(4L);
+        ListBlock list = ListBlock.builder().id(BLOCK_ID).clientId("saved-list").name("My List")
+                .type(ListBlock.ListBlockType.LIST).blockDate(LocalDate.of(2026, 10, 15)).build();
+        BlockItem place = BlockItem.builder().id(ITEM_ID).clientId("saved-place")
+                .type(BlockItem.BlockItemType.PLACE).placeId("google-1")
+                .placeName("Garden").placeLat(13.7).placeLng(100.5).visited(false).build();
+        when(tripRepository.findByIdAndUserId(TRIP_ID, USER_ID)).thenReturn(Optional.of(trip));
+        when(listBlockRepository.findByTripIdOrderByDisplayOrder(TRIP_ID)).thenReturn(List.of(list));
+        when(blockItemRepository.findByBlockIdOrderByDisplayOrder(BLOCK_ID)).thenReturn(List.of(place));
+        var snapshot = plannerService.getPlannerSnapshot(TRIP_ID, USER_ID);
+        assertEquals("teal", snapshot.blocks().getFirst().colorId());
+        assertEquals("", snapshot.blocks().getFirst().items().getFirst().address());
+        assertEquals("Garden", snapshot.blocks().getFirst().items().getFirst().name());
+        assertNull(list.getBlockColor());
+        assertNull(place.getPlaceAddress());
+        verify(blockItemRepository, never()).save(any());
+        verify(listBlockRepository, never()).save(any());
+    }
+
+    @Test
     void savesPlannerAndReturnsACompactAcknowledgement() {
         Trip trip = ownedTrip(3L);
         ListBlock savedBlock = ListBlock.builder().id(BLOCK_ID).tripId(TRIP_ID).build();
@@ -95,7 +116,7 @@ class PlannerServiceTest {
                 .itemId(ITEM_ID)
                 .build();
 
-        when(tripRepository.findByIdAndUserId(TRIP_ID, USER_ID))
+        when(tripRepository.findOwnedForUpdate(TRIP_ID, USER_ID))
                 .thenReturn(Optional.of(trip));
         when(listBlockRepository.findByTripIdOrderByDisplayOrder(TRIP_ID))
                 .thenReturn(List.of(), List.of(savedBlock));
@@ -154,7 +175,7 @@ class PlannerServiceTest {
 
     @Test
     void rejectsAStaleSnapshotBeforeWritingChildren() {
-        when(tripRepository.findByIdAndUserId(TRIP_ID, USER_ID))
+        when(tripRepository.findOwnedForUpdate(TRIP_ID, USER_ID))
                 .thenReturn(Optional.of(ownedTrip(5L)));
 
         assertThrows(
@@ -179,7 +200,7 @@ class PlannerServiceTest {
         ListBlock block = ListBlock.builder().id(BLOCK_ID).tripId(TRIP_ID).build();
         BlockItem item = BlockItem.builder().id(ITEM_ID).blockId(BLOCK_ID).build();
 
-        when(tripRepository.findByIdAndUserId(TRIP_ID, USER_ID))
+        when(tripRepository.findOwnedForUpdate(TRIP_ID, USER_ID))
                 .thenReturn(Optional.of(trip));
         when(listBlockRepository.findByTripIdOrderByDisplayOrder(TRIP_ID))
                 .thenReturn(List.of(block), List.of());
@@ -215,7 +236,7 @@ class PlannerServiceTest {
                 new BigDecimal("2500.00"),
                 List.of(expense));
 
-        when(tripRepository.findByIdAndUserId(TRIP_ID, USER_ID))
+        when(tripRepository.findOwnedForUpdate(TRIP_ID, USER_ID))
                 .thenReturn(Optional.of(trip));
         when(listBlockRepository.findByTripIdOrderByDisplayOrder(TRIP_ID))
                 .thenReturn(List.of());
@@ -269,7 +290,7 @@ class PlannerServiceTest {
     @Test
     void roundTripsDayDestinationsAndChargeTargetsWithoutRemovingStops() {
         Trip trip = ownedTrip(1L);
-        when(tripRepository.findByIdAndUserId(TRIP_ID, USER_ID)).thenReturn(Optional.of(trip));
+        when(tripRepository.findOwnedForUpdate(TRIP_ID, USER_ID)).thenReturn(Optional.of(trip));
         when(listBlockRepository.findByTripIdOrderByDisplayOrder(TRIP_ID)).thenReturn(List.of());
         when(listBlockRepository.save(any(ListBlock.class))).thenAnswer(call -> {
             ListBlock block = call.getArgument(0); block.setId(BLOCK_ID); return block;
@@ -292,6 +313,7 @@ class PlannerServiceTest {
         assertEquals(List.of("day-destinations", "charge-targets", "day-anchors"), ack.capabilities());
         when(listBlockRepository.findByTripIdOrderByDisplayOrder(TRIP_ID)).thenReturn(List.of(block.getValue()));
         when(blockItemRepository.findByBlockIdOrderByDisplayOrder(BLOCK_ID)).thenReturn(List.of(item.getValue()));
+        when(tripRepository.findByIdAndUserId(TRIP_ID, USER_ID)).thenReturn(Optional.of(trip));
         var restored = plannerService.getPlannerSnapshot(TRIP_ID, USER_ID).blocks().getFirst();
         assertEquals(destination, restored.destination());
         assertEquals(1, restored.items().size());
@@ -301,7 +323,7 @@ class PlannerServiceTest {
     @Test
     void roundTripsDayStartAndEndAnchorsIncludingTheirKind() {
         Trip trip = ownedTrip(1L);
-        when(tripRepository.findByIdAndUserId(TRIP_ID, USER_ID)).thenReturn(Optional.of(trip));
+        when(tripRepository.findOwnedForUpdate(TRIP_ID, USER_ID)).thenReturn(Optional.of(trip));
         when(listBlockRepository.findByTripIdOrderByDisplayOrder(TRIP_ID)).thenReturn(List.of());
         when(listBlockRepository.save(any(ListBlock.class))).thenAnswer(call -> {
             ListBlock block = call.getArgument(0); block.setId(BLOCK_ID); return block;
@@ -324,6 +346,7 @@ class PlannerServiceTest {
 
         when(listBlockRepository.findByTripIdOrderByDisplayOrder(TRIP_ID))
                 .thenReturn(List.of(block.getValue()));
+        when(tripRepository.findByIdAndUserId(TRIP_ID, USER_ID)).thenReturn(Optional.of(trip));
         var restored = plannerService.getPlannerSnapshot(TRIP_ID, USER_ID).blocks().getFirst();
         assertEquals(home, restored.startAnchor());
         assertEquals(hotel, restored.endAnchor());
@@ -332,7 +355,7 @@ class PlannerServiceTest {
     @Test
     void aDayWithNoAnchorsStoresNothingSoItsStartStaysDerived() {
         Trip trip = ownedTrip(1L);
-        when(tripRepository.findByIdAndUserId(TRIP_ID, USER_ID)).thenReturn(Optional.of(trip));
+        when(tripRepository.findOwnedForUpdate(TRIP_ID, USER_ID)).thenReturn(Optional.of(trip));
         when(listBlockRepository.findByTripIdOrderByDisplayOrder(TRIP_ID)).thenReturn(List.of());
         when(listBlockRepository.save(any(ListBlock.class))).thenAnswer(call -> {
             ListBlock block = call.getArgument(0); block.setId(BLOCK_ID); return block;
@@ -356,7 +379,7 @@ class PlannerServiceTest {
                 .startAnchorId("old").startAnchorKind("PLACE").startAnchorName("Old start")
                 .startAnchorAddress("Somewhere").startAnchorLat(1.0).startAnchorLng(2.0)
                 .build();
-        when(tripRepository.findByIdAndUserId(TRIP_ID, USER_ID)).thenReturn(Optional.of(trip));
+        when(tripRepository.findOwnedForUpdate(TRIP_ID, USER_ID)).thenReturn(Optional.of(trip));
         when(listBlockRepository.findByTripIdOrderByDisplayOrder(TRIP_ID)).thenReturn(List.of(existing));
         when(listBlockRepository.save(any(ListBlock.class))).thenAnswer(call -> call.getArgument(0));
         when(blockItemRepository.findByBlockIdOrderByDisplayOrder(BLOCK_ID)).thenReturn(List.of());
@@ -375,7 +398,7 @@ class PlannerServiceTest {
 
     @Test
     void rejectsAnAnchorKindThatSharingWouldNotKnowHowToHandle() {
-        when(tripRepository.findByIdAndUserId(TRIP_ID, USER_ID)).thenReturn(Optional.of(ownedTrip(1L)));
+        when(tripRepository.findOwnedForUpdate(TRIP_ID, USER_ID)).thenReturn(Optional.of(ownedTrip(1L)));
         PlannerAnchorDto unknown = new PlannerAnchorDto("x", "SECRET", "Home", null, 13.75, 100.5);
 
         assertThrows(PlannerService.PlannerValidationException.class,
@@ -387,7 +410,7 @@ class PlannerServiceTest {
 
     @Test
     void rejectsAnAnchorWithCoordinatesOutsideTheWorld() {
-        when(tripRepository.findByIdAndUserId(TRIP_ID, USER_ID)).thenReturn(Optional.of(ownedTrip(1L)));
+        when(tripRepository.findOwnedForUpdate(TRIP_ID, USER_ID)).thenReturn(Optional.of(ownedTrip(1L)));
         PlannerAnchorDto offWorld = new PlannerAnchorDto("x", "PLACE", "Nowhere", null, 120.0, 100.5);
 
         assertThrows(PlannerService.PlannerValidationException.class,
@@ -400,7 +423,7 @@ class PlannerServiceTest {
     @Test
     void roundTripsTheChosenTransitLineSequenceAndAdvertisesTheCapability() {
         Trip trip = ownedTrip(1L);
-        when(tripRepository.findByIdAndUserId(TRIP_ID, USER_ID)).thenReturn(Optional.of(trip));
+        when(tripRepository.findOwnedForUpdate(TRIP_ID, USER_ID)).thenReturn(Optional.of(trip));
         when(listBlockRepository.findByTripIdOrderByDisplayOrder(TRIP_ID)).thenReturn(List.of());
         when(blockItemRepository.findByBlockIdOrderByDisplayOrder(BLOCK_ID)).thenReturn(List.of());
         when(listBlockRepository.save(any(ListBlock.class))).thenAnswer(call -> {
@@ -423,9 +446,72 @@ class PlannerServiceTest {
         assertEquals(key, item.getValue().getArrivalRouteKey());
         when(listBlockRepository.findByTripIdOrderByDisplayOrder(TRIP_ID)).thenReturn(List.of(block.getValue()));
         when(blockItemRepository.findByBlockIdOrderByDisplayOrder(BLOCK_ID)).thenReturn(List.of(item.getValue()));
+        when(tripRepository.findByIdAndUserId(TRIP_ID, USER_ID)).thenReturn(Optional.of(trip));
         var snapshot = plannerService.getPlannerSnapshot(TRIP_ID, USER_ID);
         assertEquals(key, snapshot.blocks().getFirst().items().getFirst().arrivalRouteKey().asText());
         org.assertj.core.api.Assertions.assertThat(snapshot.capabilities()).contains("transit-route-choice-v1");
+    }
+
+    @Test
+    void roundTripsACalculatedTimeAndAdvertisesTheCapability() {
+        Trip trip = ownedTrip(1L);
+        when(tripRepository.findOwnedForUpdate(TRIP_ID, USER_ID)).thenReturn(Optional.of(trip));
+        when(tripRepository.findByIdAndUserId(TRIP_ID, USER_ID)).thenReturn(Optional.of(trip));
+        when(listBlockRepository.findByTripIdOrderByDisplayOrder(TRIP_ID)).thenReturn(List.of());
+        when(blockItemRepository.findByBlockIdOrderByDisplayOrder(BLOCK_ID)).thenReturn(List.of());
+        when(listBlockRepository.save(any(ListBlock.class))).thenAnswer(call -> {
+            ListBlock block = call.getArgument(0); block.setId(BLOCK_ID); return block;
+        });
+        when(blockItemRepository.save(any(BlockItem.class))).thenAnswer(call -> {
+            BlockItem item = call.getArgument(0); item.setId(ITEM_ID); return item;
+        });
+        when(tripRepository.saveAndFlush(trip)).thenReturn(trip);
+        var place = new PlannerItemDto("museum", "place", "GOOGLE:museum", "Museum", null, "Taipei", 25.042, 121.507,
+                null, null, null, null, false, "10:15", "11:15", null, null, null, null, null, null,
+                "museum", null, null, "calculated");
+        var day = new PlannerBlockDto("day", "itinerary", "Day 1", LocalDate.of(2026, 10, 14), "pink", List.of(place), null);
+        plannerService.savePlannerSnapshot(TRIP_ID, USER_ID, new PlannerSnapshotRequest(1L, List.of(day)));
+        var block = ArgumentCaptor.forClass(ListBlock.class);
+        var item = ArgumentCaptor.forClass(BlockItem.class);
+        verify(listBlockRepository).save(block.capture()); verify(blockItemRepository).save(item.capture());
+        assertEquals("calculated", item.getValue().getTimeSource());
+        when(listBlockRepository.findByTripIdOrderByDisplayOrder(TRIP_ID)).thenReturn(List.of(block.getValue()));
+        when(blockItemRepository.findByBlockIdOrderByDisplayOrder(BLOCK_ID)).thenReturn(List.of(item.getValue()));
+        var snapshot = plannerService.getPlannerSnapshot(TRIP_ID, USER_ID);
+        var loaded = snapshot.blocks().getFirst().items().getFirst();
+        assertEquals("10:15", loaded.time());
+        assertEquals("calculated", loaded.timeSource());
+        org.assertj.core.api.Assertions.assertThat(snapshot.capabilities()).contains("time-source-v1");
+    }
+
+    @Test
+    void roundTripsAStopsScheduleAndAdvertisesTheCapability() {
+        Trip trip = ownedTrip(1L);
+        when(tripRepository.findOwnedForUpdate(TRIP_ID, USER_ID)).thenReturn(Optional.of(trip));
+        when(tripRepository.findByIdAndUserId(TRIP_ID, USER_ID)).thenReturn(Optional.of(trip));
+        when(listBlockRepository.findByTripIdOrderByDisplayOrder(TRIP_ID)).thenReturn(List.of());
+        when(blockItemRepository.findByBlockIdOrderByDisplayOrder(BLOCK_ID)).thenReturn(List.of());
+        when(listBlockRepository.save(any(ListBlock.class))).thenAnswer(call -> {
+            ListBlock block = call.getArgument(0); block.setId(BLOCK_ID); return block;
+        });
+        when(blockItemRepository.save(any(BlockItem.class))).thenAnswer(call -> {
+            BlockItem item = call.getArgument(0); item.setId(ITEM_ID); return item;
+        });
+        when(tripRepository.saveAndFlush(trip)).thenReturn(trip);
+        var checkIn = new com.navio.tripplanningservice.dto.PlannerScheduleEntryDto("s1", "09:00", "09:10", "Check in");
+        var place = new PlannerItemDto("hotel", "place", "GOOGLE:hotel", "Hotel", null, "Taipei", 25.042, 121.507,
+                null, null, null, null, false, "09:00", "10:20", null, null, null, null, null, null,
+                "lodging", null, null, "fixed", List.of(checkIn));
+        var day = new PlannerBlockDto("day", "itinerary", "Day 1", LocalDate.of(2026, 10, 14), "pink", List.of(place), null);
+        plannerService.savePlannerSnapshot(TRIP_ID, USER_ID, new PlannerSnapshotRequest(1L, List.of(day)));
+        var block = ArgumentCaptor.forClass(ListBlock.class);
+        var item = ArgumentCaptor.forClass(BlockItem.class);
+        verify(listBlockRepository).save(block.capture()); verify(blockItemRepository).save(item.capture());
+        when(listBlockRepository.findByTripIdOrderByDisplayOrder(TRIP_ID)).thenReturn(List.of(block.getValue()));
+        when(blockItemRepository.findByBlockIdOrderByDisplayOrder(BLOCK_ID)).thenReturn(List.of(item.getValue()));
+        var snapshot = plannerService.getPlannerSnapshot(TRIP_ID, USER_ID);
+        assertEquals(List.of(checkIn), snapshot.blocks().getFirst().items().getFirst().schedule());
+        org.assertj.core.api.Assertions.assertThat(snapshot.capabilities()).contains("item-schedule-v1");
     }
 
     private PlannerBlockDto anchoredBlock(PlannerAnchorDto start, PlannerAnchorDto end) {
@@ -435,7 +521,7 @@ class PlannerServiceTest {
 
     @Test
     void rejectsChargeTargetsOutsideBatteryCapacityBeforeWriting() {
-        when(tripRepository.findByIdAndUserId(TRIP_ID, USER_ID)).thenReturn(Optional.of(ownedTrip(1L)));
+        when(tripRepository.findOwnedForUpdate(TRIP_ID, USER_ID)).thenReturn(Optional.of(ownedTrip(1L)));
         assertThrows(PlannerService.PlannerValidationException.class, () -> plannerService.savePlannerSnapshot(TRIP_ID, USER_ID, chargerRequest(1L, "Open 24 hours", 101)));
         verify(blockItemRepository, never()).save(any());
     }
@@ -444,7 +530,7 @@ class PlannerServiceTest {
         Trip trip = ownedTrip(1L);
         ListBlock savedBlock = ListBlock.builder().id(BLOCK_ID).tripId(TRIP_ID).build();
 
-        when(tripRepository.findByIdAndUserId(TRIP_ID, USER_ID)).thenReturn(Optional.of(trip));
+        when(tripRepository.findOwnedForUpdate(TRIP_ID, USER_ID)).thenReturn(Optional.of(trip));
         when(listBlockRepository.findByTripIdOrderByDisplayOrder(TRIP_ID)).thenReturn(List.of());
         when(listBlockRepository.save(any(ListBlock.class))).thenReturn(savedBlock);
         when(blockItemRepository.findByBlockIdOrderByDisplayOrder(BLOCK_ID)).thenReturn(List.of());

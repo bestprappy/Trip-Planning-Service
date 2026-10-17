@@ -81,7 +81,10 @@ public class PlannerService {
         Timer.Sample sample = Timer.start(meterRegistry);
         String outcome = "success";
         try {
-            Trip trip = requireOwnedTrip(tripId, userId);
+            // Match narrow append's lock order: trip first, then blocks/items. This also
+            // ensures a stale snapshot cannot start mutating children after an append.
+            Trip trip = tripRepository.findOwnedForUpdate(tripId, userId)
+                    .orElseThrow(() -> new TripService.TripNotFoundException(tripId));
             validateSnapshot(request);
             if (!Objects.equals(request.version(), trip.getVersion())) {
                 throw new ObjectOptimisticLockingFailureException(Trip.class, tripId);
@@ -232,8 +235,12 @@ public class PlannerService {
         item.setPlaceReviewCount(dto.reviewCount());
         item.setPlaceImageUrl(dto.imageUrl());
         item.setVisited(Boolean.TRUE.equals(dto.isVisited()));
-        item.setStartTime(parseTime(dto.time(), "time"));
-        item.setEndTime(parseTime(dto.timeEnd(), "timeEnd"));
+        LocalTime startTime = parseTime(dto.time(), "time");
+        LocalTime endTime = parseTime(dto.timeEnd(), "timeEnd");
+        item.setTimeSource(ItemTimeSources.resolve(item, dto.type(), dto.timeSource(), startTime, endTime));
+        item.setStartTime(startTime);
+        item.setEndTime(endTime);
+        ItemSchedules.apply(item, dto.type(), dto.schedule());
         item.setEstimatedCost(toMoney(dto.cost()));
 
         PlannerEvChargerDto evCharger = dto.evCharger();
@@ -378,7 +385,7 @@ public class PlannerService {
                 blocks,
                 budget,
                 trip.getVersion(),
-                trip.getUpdatedAt(), List.of("day-destinations", "charge-targets", "day-anchors", "trip-energy-v1", "observed-soc-v1", "trip-garage-v1", "canonical-optimization-v1", "leg-travel-mode-v1", "cycling-legs-v1", "transit-preferences-v1", "transit-route-choice-v1", "precise-charging-v1"),
+                trip.getUpdatedAt(), List.of("day-destinations", "charge-targets", "day-anchors", "trip-energy-v1", "observed-soc-v1", "trip-garage-v1", "canonical-optimization-v1", "leg-travel-mode-v1", "cycling-legs-v1", "transit-preferences-v1", "transit-route-choice-v1", "precise-charging-v1", "time-source-v1", "item-schedule-v1"),
                 PlannerEnergyState.read(trip));
     }
 
@@ -396,7 +403,7 @@ public class PlannerService {
                 kind,
                 block.getName(),
                 block.getBlockDate(),
-                block.getBlockColor(),
+                Objects.requireNonNullElse(block.getBlockColor(), "teal"),
                 items,
                 block.getDestinationId() == null ? null : new PlannerDestinationDto(
                         block.getDestinationId(), block.getDestinationName(),
@@ -446,7 +453,7 @@ public class PlannerService {
                 item.getPlaceId(),
                 item.getPlaceName(),
                 item.getPlaceDescription(),
-                item.getPlaceAddress(),
+                "place".equals(itemType) ? Objects.requireNonNullElse(item.getPlaceAddress(), "") : item.getPlaceAddress(),
                 item.getPlaceLat(),
                 item.getPlaceLng(),
                 item.getPlaceRating(),
@@ -466,7 +473,9 @@ public class PlannerService {
                         ? com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.textNode(item.getArrivalMode())
                         : null,
                 "place".equals(itemType) && item.getArrivalRouteKey() != null
-                        ? com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.textNode(item.getArrivalRouteKey()) : null);
+                        ? com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.textNode(item.getArrivalRouteKey()) : null,
+                "place".equals(itemType) ? item.getTimeSource() : null,
+                "place".equals(itemType) ? ItemSchedules.read(item) : null);
     }
 
     private void validateSnapshot(PlannerSnapshotRequest request) {
