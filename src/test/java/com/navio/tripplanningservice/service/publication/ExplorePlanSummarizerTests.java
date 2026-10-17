@@ -93,7 +93,7 @@ class ExplorePlanSummarizerTests {
     }
 
     private PublicDayDto day(PublicItemDto... items) {
-        return new PublicDayDto("Day", null, null, null, null, List.of(items));
+        return new PublicDayDto("Day", null, null, null, null, null, List.of(items));
     }
 
     private PublicItemDto place(String name, String imageUrl) {

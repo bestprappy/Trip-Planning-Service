@@ -65,6 +65,9 @@ public class PlanPublicationSanitizer {
      */
     public static final int SANITIZER_VERSION = 1;
 
+    /** Same format as user-management's palette ids. */
+    private static final java.util.regex.Pattern PALETTE_COLOR_ID = java.util.regex.Pattern.compile("[a-z][a-z0-9-]{0,39}");
+
     /**
      * Anchor kinds allowed into a published snapshot.
      *
@@ -121,6 +124,15 @@ public class PlanPublicationSanitizer {
                 snapshot.endDate(), snapshot.dayCount(), snapshot.days(), snapshot.budget(), snapshot.included());
     }
 
+    /**
+     * Passes only palette ids. Older trips may hold free-form values (the
+     * column once took hex codes), and readers embed the id in a CSS custom
+     * property name, so anything else is dropped rather than published.
+     */
+    static String safeColorId(String colorId) {
+        return colorId != null && PALETTE_COLOR_ID.matcher(colorId).matches() ? colorId : null;
+    }
+
     private PublicDayDto sanitizeDay(PlannerBlockDto block, int dayNumber, PublicationOptions options) {
         List<PublicItemDto> items = new ArrayList<>();
         for (PlannerItemDto item : nullSafe(block.items())) {
@@ -134,6 +146,7 @@ public class PlanPublicationSanitizer {
                 "Day " + dayNumber,
                 options.includeDates() ? block.date() : null,
                 safeText(block.title()),
+                safeColorId(block.colorId()),
                 sanitizeAnchor(block.startAnchor(), true),
                 sanitizeAnchor(block.endAnchor(), false),
                 List.copyOf(items));

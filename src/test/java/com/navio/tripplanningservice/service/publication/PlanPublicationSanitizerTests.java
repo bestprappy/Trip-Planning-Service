@@ -66,6 +66,26 @@ class PlanPublicationSanitizerTests {
         assertThat(published.startsAt().redacted()).isTrue();
     }
 
+    // ---------------------------------------------------------------- colors
+
+    @Test
+    void publishesEachDaysPaletteColorSoReadersSeeTheOwnersColors() {
+        PlannerBlockDto amber = itineraryDay("d1", LocalDate.of(2026, 3, 1)).withColor("amber").build();
+        PlannerBlockDto custom = itineraryDay("d2", LocalDate.of(2026, 3, 2)).withColor("sunset-orange-2").build();
+
+        List<PublicDayDto> published = sanitizeDays(PublicationOptions.none(), amber, custom);
+
+        assertThat(published).extracting(PublicDayDto::colorId).containsExactly("amber", "sunset-orange-2");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"#FF6B6B", "Teal", "", "2-tone", "x);background:url(https://evil.example)", "a-very-long-color-id-that-is-over-forty-chars"})
+    void dropsAStoredColorThatIsNotAPaletteId(String stored) {
+        PlannerBlockDto day = itineraryDay("d1", LocalDate.of(2026, 3, 1)).withColor(stored).build();
+
+        assertThat(sanitizeDays(day, PublicationOptions.none()).getFirst().colorId()).isNull();
+    }
+
     @Test
     void usesTheEndWordingWhenThePrivateAnchorEndsTheDay() {
         PlannerBlockDto day = itineraryDay("d1", LocalDate.of(2026, 3, 1))
@@ -541,6 +561,7 @@ class PlanPublicationSanitizerTests {
         private PlannerAnchorDto end;
         private PlannerDestinationDto destination;
         private List<PlannerItemDto> items = List.of();
+        private String colorId = "slate";
 
         private DayBuilder(String id, LocalDate date) {
             this.id = id;
@@ -562,13 +583,18 @@ class PlanPublicationSanitizerTests {
             return this;
         }
 
+        DayBuilder withColor(String value) {
+            this.colorId = value;
+            return this;
+        }
+
         DayBuilder withItems(PlannerItemDto... values) {
             this.items = List.of(values);
             return this;
         }
 
         PlannerBlockDto build() {
-            return new PlannerBlockDto(id, "itinerary", "Bangkok", date, "slate",
+            return new PlannerBlockDto(id, "itinerary", "Bangkok", date, colorId,
                     items, destination, start, end);
         }
     }

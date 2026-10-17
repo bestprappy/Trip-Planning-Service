@@ -55,6 +55,7 @@ class SharedPlanControllerTests {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.plan.title").value("Songkran road trip"))
                 .andExpect(jsonPath("$.plan.days[0].label").value("Day 1"))
+                .andExpect(jsonPath("$.plan.days[0].colorId").value("amber"))
                 .andExpect(jsonPath("$.plan.days[0].items[0].name").value("Wat Arun"))
                 .andExpect(jsonPath("$.authorName").value("Kanya S."));
     }
@@ -118,7 +119,7 @@ class SharedPlanControllerTests {
                 "place", "Wat Arun", "A landmark", null, 4.6, 12000,
                 "09:00", "11:00", null, null, null, null, null, null);
         PublicDayDto day = new PublicDayDto(
-                "Day 1", null, "Bangkok",
+                "Day 1", null, "Bangkok", "amber",
                 PublicAnchorDto.redactedStart(),
                 PublicAnchorDto.named("Bangkok Marriott"),
                 List.of(item));

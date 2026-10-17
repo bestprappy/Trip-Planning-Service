@@ -12,6 +12,10 @@ import java.util.List;
  *                  the owner did not publish real dates
  * @param date      null unless the owner opted into travel dates. Removed from
  *                  the field, not merely hidden by the page
+ * @param colorId   the palette color id the owner gave the day, so the reader
+ *                  sees the same colors. Null for snapshots published before
+ *                  colors were shared, or when the stored value is not a
+ *                  palette id; readers then fall back to a default color
  * @param startsAt  null when the day inherits its start from the previous day.
  *                  A redacted anchor stays present and redacted rather than
  *                  becoming null, so the reader is told something was withheld
@@ -22,6 +26,7 @@ public record PublicDayDto(
         String label,
         LocalDate date,
         String title,
+        String colorId,
         PublicAnchorDto startsAt,
         PublicAnchorDto endsAt,
         List<PublicItemDto> items
