@@ -85,6 +85,19 @@ class ExplorePlanSummarizerTests {
         assertThat(summary.highlights()).isEmpty();
     }
 
+    @Test
+    void exposesAPublishedStopReferenceForMissingPhotosAndRealActivityNumbers() {
+        PublicItemDto stop = new PublicItemDto("place", "Temple", null, null, null, null,
+                null, null, null, null, null, null, null, null, "GOOGLE:ChIJ1234567890", null, 13.0, 100.0);
+        PublicPlanSnapshot plan = new PublicPlanSnapshot(1,"Trip","Bangkok","Thailand",null,null,1,
+                List.of(day(stop)),null,PublicationOptions.none());
+        var summary = summarizer.summarize("tok",plan,"Traveler",LISTED,LISTED,1250,12);
+        assertThat(summary.coverImageUrl()).isNull();
+        assertThat(summary.coverPlaceId()).isEqualTo("GOOGLE:ChIJ1234567890");
+        assertThat(summary.viewCount()).isEqualTo(1250);
+        assertThat(summary.copyCount()).isEqualTo(12);
+    }
+
     private ExplorePlanSummary summarize(PublicDayDto... days) {
         PublicPlanSnapshot plan = new PublicPlanSnapshot(
                 1, "Songkran road trip", "Bangkok", "Thailand", null, null, days.length,

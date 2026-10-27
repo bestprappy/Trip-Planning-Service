@@ -57,6 +57,7 @@ class TripPublicationServiceTests {
     @Mock PlannerService plannerService;
     @Mock ShareTokenGenerator tokenGenerator;
     @Mock TripService tripService;
+    @Mock com.navio.tripplanningservice.repository.SharedPlanCopyRepository copyEvents;
 
     private TripPublicationService service;
 
@@ -69,7 +70,7 @@ class TripPublicationServiceTests {
                 new PlanPublicationSanitizer(),
                 tokenGenerator,
                 new ObjectMapper().registerModule(new JavaTimeModule()),
-                new ExplorePlanSummarizer(), tripService);
+                new ExplorePlanSummarizer(), tripService, copyEvents);
     }
 
     // ---------------------------------------------------------- authorization
@@ -519,9 +520,40 @@ class TripPublicationServiceTests {
         });
 
         service.copySharedPlan("tok-existing", STRANGER);
+        var order = org.mockito.Mockito.inOrder(plannerService, copyEvents);
+        order.verify(plannerService).savePlannerSnapshot(any(), org.mockito.ArgumentMatchers.eq(STRANGER), any());
+        order.verify(copyEvents).recordSuccessfulCopy(any(), any(), org.mockito.ArgumentMatchers.eq(STRANGER));
 
         verify(tripRepository, never()).findById(TRIP);
         verify(plannerService, never()).getPlannerSnapshot(TRIP, OWNER);
+    }
+
+    @Test
+    void aFailedPlannerSaveNeverRecordsASuccessfulCopy() {
+        TripPublication listed = activePublication(2);
+        listed.setListedInExplore(true);
+        when(publicationRepository.findByTokenAndStatus("tok-existing", TripPublication.PublicationStatus.ACTIVE)).thenReturn(Optional.of(listed));
+        when(tripRepository.saveAndFlush(any())).thenAnswer(call -> {
+            Trip copy = call.getArgument(0); copy.setId(UUID.randomUUID()); copy.setVersion(0L); return copy;
+        });
+        when(plannerService.savePlannerSnapshot(any(), any(), any())).thenThrow(new IllegalStateException("save failed"));
+        assertThatThrownBy(() -> service.copySharedPlan("tok-existing", STRANGER)).isInstanceOf(IllegalStateException.class);
+        verifyNoInteractions(copyEvents);
+    }
+
+    @Test
+    void listedDetailExposesOnlyAggregatesAndUnlistedDetailDoesNotQueryCopiers() {
+        TripPublication listed = activePublication(2);
+        var id = UUID.randomUUID(); listed.setId(id); listed.setListedInExplore(true); listed.setViewCount(12L);
+        when(publicationRepository.findByTokenAndStatus("tok-existing", TripPublication.PublicationStatus.ACTIVE)).thenReturn(Optional.of(listed));
+        when(copyEvents.counts(List.of(id))).thenReturn(java.util.Map.of(id, new com.navio.tripplanningservice.repository.SharedPlanCopyRepository.CopyStats(8,3)));
+        var response=service.readSharedPlan("tok-existing");
+        assertThat(response.engagement().copyCount()).isEqualTo(8);
+        assertThat(response.engagement().uniqueCopierCount()).isEqualTo(3);
+        assertThat(response.engagement().viewCount()).isEqualTo(13);
+        listed.setListedInExplore(false);
+        assertThat(service.readSharedPlan("tok-existing").engagement()).isNull();
+        verify(copyEvents).counts(List.of(id));
     }
 
     @Test
@@ -618,6 +650,33 @@ class TripPublicationServiceTests {
         service.updateExploreListing(TRIP, OWNER, true, null);
 
         assertThat(published.getAuthorDisplayName()).isEqualTo("Kanya S.");
+    }
+
+    @Test
+    void copyRetainsPublishedTransportAndSelectedPublicTransitSequence() throws Exception {
+        TripPublication listed = activePublication(2);
+        listed.setListedInExplore(true);
+        var json = new ObjectMapper().readTree("""
+                {"sanitizerVersion":1,"title":"Shared route","dayCount":1,
+                 "days":[{"label":"Day 1","items":[
+                   {"type":"place","name":"First","placeId":"public-first","lat":13.0,"lng":100.0},
+                   {"type":"place","name":"Second","placeId":"public-second","lat":13.1,"lng":100.1,"arrivalMode":"rail","placeType":"train_station"}]}]}
+                """);
+        var second = (com.fasterxml.jackson.databind.node.ObjectNode) json.path("days").get(0).path("items").get(1);
+        second.put("arrivalRouteKey", "v1:" + new ObjectMapper().writeValueAsString(List.of(List.of("SUBWAY","Blue","B","First","Second"))));
+        listed.setSnapshot(json.toString());
+        when(publicationRepository.findByTokenAndStatus("tok-existing", TripPublication.PublicationStatus.ACTIVE)).thenReturn(Optional.of(listed));
+        when(tripRepository.saveAndFlush(any())).thenAnswer(call -> {
+            Trip copy=call.getArgument(0);copy.setId(UUID.randomUUID());copy.setVersion(0L);return copy;
+        });
+        service.copySharedPlan("tok-existing", STRANGER);
+        ArgumentCaptor<PlannerSnapshotRequest> request=ArgumentCaptor.forClass(PlannerSnapshotRequest.class);
+        verify(plannerService).savePlannerSnapshot(any(), org.mockito.ArgumentMatchers.eq(STRANGER), request.capture());
+        PlannerItemDto copied=request.getValue().blocks().getFirst().items().get(1);
+        assertThat(copied.arrivalMode().asText()).isEqualTo("rail");
+        assertThat(copied.arrivalRouteKey().asText()).contains("Blue");
+        assertThat(copied.placeType()).isEqualTo("train_station");
+        verify(tripService).getTripById(any(), org.mockito.ArgumentMatchers.eq(STRANGER));
     }
 
     @Test

@@ -23,6 +23,10 @@ public record SharedPlanResponse(
         PublicPlanSnapshot plan,
         Instant publishedAt,
         boolean listedInExplore,
-        String authorName
+        String authorName,
+        PlanEngagement engagement
 ) {
+    public SharedPlanResponse(PublicPlanSnapshot plan, Instant publishedAt, boolean listedInExplore, String authorName) {
+        this(plan, publishedAt, listedInExplore, authorName, null);
+    }
 }

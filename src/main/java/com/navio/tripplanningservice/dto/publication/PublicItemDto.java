@@ -34,8 +34,24 @@ public record PublicItemDto(
         String placeId,
         String address,
         Double lat,
-        Double lng
+        Double lng,
+        String arrivalMode,
+        String arrivalRouteKey,
+        String placeType
 ) {
+    public PublicItemDto(String type, String name, String description, String imageUrl,
+                         Double rating, Integer reviewCount, String time, String timeEnd,
+                         Double cost, String notes, String noteContent, String checklistTitle,
+                         List<String> checklistLabels, PublicChargerDto charger,
+                         String placeId, String address, Double lat, Double lng) {
+        this(type,name,description,imageUrl,rating,reviewCount,time,timeEnd,cost,notes,noteContent,
+                checklistTitle,checklistLabels,charger,placeId,address,lat,lng,null,null,null);
+    }
+
+    public PublicItemDto withTransport(String mode, String routeKey, String publicPlaceType) {
+        return new PublicItemDto(type,name,description,imageUrl,rating,reviewCount,time,timeEnd,cost,notes,
+                noteContent,checklistTitle,checklistLabels,charger,placeId,address,lat,lng,mode,routeKey,publicPlaceType);
+    }
     public PublicItemDto(String type, String name, String description, String imageUrl,
                          Double rating, Integer reviewCount, String time, String timeEnd,
                          Double cost, String notes, String noteContent, String checklistTitle,

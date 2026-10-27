@@ -34,6 +34,7 @@ class PostgresSchemaTests {
     @Autowired
     Flyway flyway;
     @Autowired jakarta.persistence.EntityManager entityManager;
+    @Autowired javax.sql.DataSource dataSource;
 
     @Test
     void migrationsApplyAndEntityMappingsMatchThePostgresSchema() {
@@ -57,12 +58,21 @@ class PostgresSchemaTests {
                      var sql = connection.createStatement()) {
                     sql.execute("INSERT INTO trip.trip (id, user_id, display_name, start_date, end_date, destination_id, destination_name) VALUES ('11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222', 'Preserved trip', CURRENT_DATE, CURRENT_DATE, 'test', 'Test')");
                 }
+                try (var connection = java.sql.DriverManager.getConnection(upgradeUrl, username, password);
+                     var sql = connection.createStatement()) {
+                    sql.execute("INSERT INTO trip.trip_publication(id,trip_id,token,snapshot,sanitizer_version,source_trip_version) VALUES ('33333333-3333-4333-8333-333333333333','11111111-1111-4111-8111-111111111111','existing-token','{}',1,0)");
+                    sql.execute("INSERT INTO trip.trip(id,user_id,start_date,end_date,destination_id,destination_name) VALUES ('44444444-4444-4444-8444-444444444444','22222222-2222-4222-8222-222222222222',CURRENT_DATE,CURRENT_DATE,'shared-plan:33333333-3333-4333-8333-333333333333','Recovered copy')");
+                }
                 var upgraded = Flyway.configure().dataSource(upgradeUrl, username, password)
                     .schemas("trip").defaultSchema("trip").load();
                 // V14 energy state, V15 garage membership, V16 stop arrival mode,
                 // V17 precise charging plan, V18 transit route choice, V19 time source and V20 stop schedule.
-                assertThat(upgraded.migrate().migrationsExecuted).isEqualTo(7);
+                assertThat(upgraded.migrate().migrationsExecuted).isEqualTo(8);
                 upgraded.validate();
+                try (var connection = java.sql.DriverManager.getConnection(upgradeUrl, username, password);
+                     var sql = connection.createStatement(); var row = sql.executeQuery("SELECT count(*) FROM trip.shared_plan_copy WHERE publication_id='33333333-3333-4333-8333-333333333333'")) {
+                    assertThat(row.next()).isTrue(); assertThat(row.getLong(1)).isEqualTo(1);
+                }
                 try (var connection = java.sql.DriverManager.getConnection(upgradeUrl, username, password);
                      var sql = connection.createStatement();
                      var row = sql.executeQuery("SELECT display_name, initial_soc_pct, energy_vehicle_snapshot, garage_vehicle_ids FROM trip.trip WHERE id = '11111111-1111-4111-8111-111111111111'")) {
@@ -76,6 +86,33 @@ class PostgresSchemaTests {
                 statement.execute("DROP DATABASE " + database);
             }
         }
+    }
+
+    @Test
+    void copyLedgerCountsSuccessfulEventsAndDistinctTravelersAndSurvivesCopyDeletion() {
+        var jdbc = org.springframework.jdbc.core.simple.JdbcClient.create(dataSource);
+        var trip = java.util.UUID.randomUUID();
+        var publication = java.util.UUID.randomUUID();
+        var user = java.util.UUID.randomUUID();
+        jdbc.sql("INSERT INTO trip.trip(id,user_id,start_date,end_date,destination_id,destination_name) VALUES (:id,:user,CURRENT_DATE,CURRENT_DATE,'test','Test')")
+            .param("id", trip).param("user", user).update();
+        jdbc.sql("INSERT INTO trip.trip_publication(id,trip_id,token,snapshot,sanitizer_version,source_trip_version) VALUES (:id,:trip,:token,'{}',1,0)")
+            .param("id", publication).param("trip",trip).param("token","test-"+publication).update();
+        var repository = new com.navio.tripplanningservice.repository.SharedPlanCopyRepository(jdbc);
+        var copied = java.util.UUID.randomUUID();
+        jdbc.sql("INSERT INTO trip.trip(id,user_id,start_date,end_date,destination_id,destination_name) VALUES (:id,:user,CURRENT_DATE,CURRENT_DATE,'test','Copy')")
+            .param("id",copied).param("user",user).update();
+        repository.recordSuccessfulCopy(publication,copied,user);
+        repository.recordSuccessfulCopy(publication,copied,user); // repeated event identity is idempotent
+        repository.recordSuccessfulCopy(publication,java.util.UUID.randomUUID(),user);
+        repository.recordSuccessfulCopy(publication,java.util.UUID.randomUUID(),java.util.UUID.randomUUID());
+        jdbc.sql("DELETE FROM trip.trip WHERE id=:id").param("id",copied).update();
+        var counts=repository.counts(java.util.List.of(publication));
+        assertThat(counts.get(publication).copies()).isEqualTo(3);
+        assertThat(counts.get(publication).travelers()).isEqualTo(2);
+        assertThat(repository.counts(java.util.List.of())).isEmpty();
+        jdbc.sql("DELETE FROM trip.trip_publication WHERE id=:id").param("id",publication).update();
+        assertThat(repository.counts(java.util.List.of(publication))).isEmpty();
     }
 
     @Test

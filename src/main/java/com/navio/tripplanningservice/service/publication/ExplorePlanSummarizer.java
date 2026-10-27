@@ -28,6 +28,13 @@ public class ExplorePlanSummarizer {
             String authorName,
             Instant listedAt,
             Instant updatedAt) {
+        return summarize(token, plan, authorName, listedAt, updatedAt, 0, 0);
+    }
+
+    public ExplorePlanSummary summarize(String token, PublicPlanSnapshot plan, String authorName,
+            Instant listedAt, Instant updatedAt, long viewCount, long copyCount) {
+        String firstPlaceId = null;
+        String imagePlaceId = null;
         List<String> highlights = new ArrayList<>();
         List<ExplorePlanSummary.ExploreDayShape> days = new ArrayList<>();
         String coverImageUrl = null;
@@ -51,8 +58,10 @@ public class ExplorePlanSummarizer {
                     case "place" -> {
                         placeCount++;
                         stops.add("place");
+                        if (firstPlaceId == null && item.placeId() != null) firstPlaceId = item.placeId();
                         if (coverImageUrl == null && item.imageUrl() != null) {
                             coverImageUrl = item.imageUrl();
+                            imagePlaceId = item.placeId();
                         }
                         if (highlights.size() < MAX_HIGHLIGHTS
                                 && item.name() != null
@@ -82,7 +91,9 @@ public class ExplorePlanSummarizer {
                 List.copyOf(highlights),
                 List.copyOf(days),
                 listedAt,
-                updatedAt);
+                updatedAt,
+                coverImageUrl != null ? imagePlaceId : firstPlaceId,
+                viewCount, copyCount);
     }
 
     private <T> List<T> nullSafe(List<T> values) {

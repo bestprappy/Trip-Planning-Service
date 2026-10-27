@@ -135,8 +135,24 @@ public class PlanPublicationSanitizer {
 
     private PublicDayDto sanitizeDay(PlannerBlockDto block, int dayNumber, PublicationOptions options) {
         List<PublicItemDto> items = new ArrayList<>();
+        PlannerItemDto previousStop = null;
+        PublicItemDto previousPublic = null;
         for (PlannerItemDto item : nullSafe(block.items())) {
             PublicItemDto sanitized = sanitizeItem(item, options);
+            if (sanitized != null && ("place".equals(sanitized.type()) || "charger".equals(sanitized.type()))) {
+                boolean publicLeg = previousPublic != null && previousPublic.lat() != null && previousPublic.lng() != null
+                        && sanitized.lat() != null && sanitized.lng() != null;
+                String mode = publicLeg ? PublishedTransport.resolve(previousStop, item) : null;
+                String key = publicLeg && PublishedTransport.transit(mode) && item.arrivalRouteKey() != null && item.arrivalRouteKey().isTextual()
+                        ? PublishedTransport.routeKey(item.arrivalRouteKey().asText()) : null;
+                String placeType = sanitized.lat() != null ? PublishedTransport.type(item) : null;
+                sanitized = sanitized.withTransport(mode,key,placeType == null || placeType.isEmpty() ? null : placeType);
+                previousStop = item;
+                previousPublic = sanitized;
+            } else if (item == null || (!"note".equalsIgnoreCase(item.type()) && !"checklist".equalsIgnoreCase(item.type()))) {
+                previousStop = null;
+                previousPublic = null;
+            }
             if (sanitized != null) {
                 items.add(sanitized);
             }

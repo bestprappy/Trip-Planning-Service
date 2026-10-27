@@ -34,8 +34,19 @@ public record ExplorePlanSummary(
         List<String> highlights,
         List<ExploreDayShape> days,
         Instant listedAt,
-        Instant updatedAt
+        Instant updatedAt,
+        String coverPlaceId,
+        long viewCount,
+        long copyCount
 ) {
+    public ExplorePlanSummary(String token, String title, String authorName, String destinationCity,
+            String destinationCountry, int dayCount, int placeCount, int chargerCount,
+            String coverImageUrl, List<String> highlights, List<ExploreDayShape> days,
+            Instant listedAt, Instant updatedAt) {
+        this(token, title, authorName, destinationCity, destinationCountry, dayCount, placeCount,
+                chargerCount, coverImageUrl, highlights, days, listedAt, updatedAt, null, 0, 0);
+    }
+
     /**
      * @param stops the kind of each stop in order: {@code place} or {@code charger}.
      *              Notes and checklists are not stops and are not counted

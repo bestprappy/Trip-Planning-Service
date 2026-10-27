@@ -66,6 +66,7 @@ public class TripPublicationService {
     private final ObjectMapper objectMapper;
     private final ExplorePlanSummarizer summarizer;
     private final TripService tripService;
+    private final com.navio.tripplanningservice.repository.SharedPlanCopyRepository copyEvents;
 
     public PublicationResponse getPublication(UUID tripId, UUID userId) {
         Trip trip = requireOwnedTrip(tripId, userId);
@@ -199,7 +200,8 @@ public class TripPublicationService {
                 snapshot,
                 publication.getPublishedAt(),
                 publication.isListed(),
-                publication.getAuthorDisplayName());
+                publication.getAuthorDisplayName(),
+                publication.isListed() ? engagement(publication, true) : null);
     }
 
     /**
@@ -242,12 +244,16 @@ public class TripPublicationService {
                 ? publicationRepository.findTrendingInExplore(PlanPublicationSanitizer.SANITIZER_VERSION, pageable)
                 : publicationRepository.findListedInExplore(PlanPublicationSanitizer.SANITIZER_VERSION, pageable);
 
+        var counts = copyEvents.counts(rows.getContent().stream().map(TripPublication::getId)
+                .filter(Objects::nonNull).toList());
         List<ExplorePlanSummary> summaries = new ArrayList<>(rows.getNumberOfElements());
         for (TripPublication row : rows.getContent()) {
             try {
                 PublicPlanSnapshot plan = objectMapper.readValue(row.getSnapshot(), PublicPlanSnapshot.class);
                 summaries.add(summarizer.summarize(
-                        row.getToken(), plan, row.getAuthorDisplayName(), row.getListedAt(), row.getUpdatedAt()));
+                        row.getToken(), plan, row.getAuthorDisplayName(), row.getListedAt(), row.getUpdatedAt(),
+                        row.getViewCount() == null ? 0 : row.getViewCount(),
+                        counts.getOrDefault(row.getId(), com.navio.tripplanningservice.repository.SharedPlanCopyRepository.CopyStats.ZERO).copies()));
             } catch (com.fasterxml.jackson.core.JsonProcessingException exception) {
                 log.error("Stored snapshot for publication {} is unreadable; left out of Explore",
                         row.getId(), exception);
@@ -315,7 +321,18 @@ public class TripPublicationService {
         }
         plannerService.savePlannerSnapshot(copy.getId(), userId,
                 new PlannerSnapshotRequest(copy.getVersion(), blocks, budget));
+        copyEvents.recordSuccessfulCopy(publication.getId(), copy.getId(), userId);
         return tripService.getTripById(copy.getId(), userId);
+    }
+
+    private com.navio.tripplanningservice.dto.publication.PlanEngagement engagement(TripPublication publication, boolean includeCurrentView) {
+        var stats = publication.getId() == null
+                ? com.navio.tripplanningservice.repository.SharedPlanCopyRepository.CopyStats.ZERO
+                : copyEvents.counts(List.of(publication.getId())).getOrDefault(publication.getId(),
+                    com.navio.tripplanningservice.repository.SharedPlanCopyRepository.CopyStats.ZERO);
+        long views = publication.getViewCount() == null ? 0 : publication.getViewCount();
+        return new com.navio.tripplanningservice.dto.publication.PlanEngagement(
+                views + (includeCurrentView ? 1 : 0), stats.copies(), stats.travelers());
     }
 
     private PlannerItemDto copyPublishedItem(PublicItemDto item) {
@@ -329,7 +346,10 @@ public class TripPublicationService {
                             item.lat(), item.lng(), item.rating(),
                             item.reviewCount(), item.imageUrl(), item.notes(), false,
                             item.time(), item.timeEnd(), item.cost(), copyCharger(item.charger()),
-                            null, null, null)
+                            null, null, null, null, item.placeType(),
+                            PublishedTransport.mode(item.arrivalMode()) == null ? null : com.fasterxml.jackson.databind.node.TextNode.valueOf(item.arrivalMode()),
+                            PublishedTransport.transit(item.arrivalMode()) && PublishedTransport.routeKey(item.arrivalRouteKey()) != null
+                                    ? com.fasterxml.jackson.databind.node.TextNode.valueOf(item.arrivalRouteKey()) : null)
                     : new PlannerItemDto(id, "note", null, null, null, null, null, null,
                             null, null, null, null, null, null, null, null, null,
                             "Stop to locate: " + (item.name() == null ? "Unnamed stop" : item.name()), null, null);

@@ -497,6 +497,32 @@ class PlanPublicationSanitizerTests {
         assertThat(toJson(published)).doesNotContain(HOME).doesNotContain("Soi Ari");
     }
 
+    @Test
+    void publishesTransportOnlyBetweenAdjacentLocatedPublicStops() throws Exception {
+        PlannerItemDto first = transportStop("a", "First", 13.0, "transit", "v1:[[\"BUS\",\"Home line\",null,\"" + HOME + "\",\"First\"]]");
+        PlannerItemDto second = transportStop("b", "Second", 13.1, "walk", null);
+        PlannerItemDto missing = transportStop("c", "Unlocated", null, "transit", null);
+        PlannerItemDto fourth = transportStop("d", "Fourth", 13.2, "bus", null);
+        PlannerItemDto fifth = transportStop("e", "Fifth", 13.3, "rail", "v1:[[\"SUBWAY\",\"Blue\",\"B\",\"Fourth\",\"Fifth\"]]");
+        var snapshot = sanitizeSnapshot(PublicationOptions.none(), itineraryDay("d1", LocalDate.of(2026, 10, 27)).withItems(first, second, missing, fourth, fifth).build());
+        var json = mapper.readTree(toJson(snapshot));
+        var items = json.path("days").get(0).path("items");
+        assertThat(items.get(0).hasNonNull("arrivalMode")).isFalse();
+        assertThat(items.get(1).path("arrivalMode").asText()).isEqualTo("walk");
+        assertThat(items.get(2).hasNonNull("arrivalMode")).isFalse();
+        assertThat(items.get(3).hasNonNull("arrivalMode")).isFalse();
+        assertThat(items.get(4).path("arrivalMode").asText()).isEqualTo("rail");
+        assertThat(items.get(4).path("arrivalRouteKey").asText()).contains("Blue");
+        assertThat(toJson(snapshot)).doesNotContain(HOME).doesNotContain("Home line");
+    }
+
+    private PlannerItemDto transportStop(String id, String name, Double lat, String mode, String key) {
+        return new PlannerItemDto(id,"place","GOOGLE:"+id,name,null,"Public address",lat,100.0,null,null,null,null,false,
+                null,null,null,null,null,null,null,null,null,
+                mode == null ? null : com.fasterxml.jackson.databind.node.TextNode.valueOf(mode),
+                key == null ? null : com.fasterxml.jackson.databind.node.TextNode.valueOf(key));
+    }
+
     // ------------------------------------------------------------------ fixtures
 
     private Trip trip() {
