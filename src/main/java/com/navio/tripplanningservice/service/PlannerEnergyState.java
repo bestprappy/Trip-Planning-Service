@@ -16,8 +16,12 @@ final class PlannerEnergyState {
     private PlannerEnergyState() {}
     static void apply(Trip trip, JsonNode state) {
         if (state == null) return;
-        if (state.isNull()) { trip.setInitialSocPct(null); trip.setEnergyVehicleSnapshot(null); trip.setGarageVehicleIds(null); return; }
+        if (state.isNull()) { trip.setInitialSocPct(null); trip.setEnergyVehicleSnapshot(null); trip.setGarageVehicleIds(null); trip.setTripVehicles(null); return; }
         if (!state.isObject()) fail("Invalid trip energy state");
+        if (state.has("vehicles")) {
+            var vehicles=TripVehicleDescriptors.validate(state.get("vehicles"));
+            trip.setTripVehicles(JSON.convertValue(vehicles,new com.fasterxml.jackson.core.type.TypeReference<java.util.List<Map<String,Object>>>(){}));
+        }
         if (state.has("garageVehicleIds")) {
             var ids = state.get("garageVehicleIds");
             if (!ids.isArray() || ids.size() > 25) fail("Trip garage must contain at most 25 vehicle IDs");
@@ -51,7 +55,7 @@ final class PlannerEnergyState {
         if (value.decimalValue().stripTrailingZeros().scale() > 2) fail("SoC supports at most two decimal places");
         return value.decimalValue();
     }
-    private static void validateSnapshot(JsonNode s) {
+    static void validateSnapshot(JsonNode s) {
         fields(s, Set.of("version", "vehicleId", "label", "profile", "maxAcKw", "maxDcKw", "connectorTypes", "legacyConsumptionConfirmed"));
         if (!s.isObject() || s.path("version").asInt() != 1 || !s.path("vehicleId").isTextual() || s.path("vehicleId").asText().isBlank()
                 || !s.path("label").isTextual() || s.path("label").asText().length() > 240 || !s.path("connectorTypes").isArray()
@@ -90,7 +94,8 @@ final class PlannerEnergyState {
         if(trip.getInitialSocPct()==null) node.putNull("initialSocPct"); else node.put("initialSocPct",trip.getInitialSocPct());
         node.set("vehicleSnapshot",JSON.valueToTree(trip.getEnergyVehicleSnapshot()));
         if (trip.getGarageVehicleIds()!=null) node.set("garageVehicleIds", JSON.valueToTree(trip.getGarageVehicleIds()));
-        return trip.getInitialSocPct()==null && trip.getEnergyVehicleSnapshot()==null && trip.getGarageVehicleIds()==null ? JsonNodeFactory.instance.nullNode() : node;
+        if(trip.getTripVehicles()!=null) node.set("vehicles",JSON.valueToTree(trip.getTripVehicles()));
+        return trip.getInitialSocPct()==null && trip.getEnergyVehicleSnapshot()==null && trip.getGarageVehicleIds()==null && trip.getTripVehicles()==null ? JsonNodeFactory.instance.nullNode() : node;
     }
     static JsonNode readObservation(BlockItem item) {
         return item.getObservedSocPct()==null ? JsonNodeFactory.instance.nullNode() : JsonNodeFactory.instance.objectNode().put("socPct",item.getObservedSocPct());

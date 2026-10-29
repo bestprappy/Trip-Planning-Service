@@ -128,6 +128,7 @@ public class TripPublicationService {
         publication.setIncludeDates(options.includeDates());
         publication.setIncludeNotes(options.includeNotes());
         publication.setIncludeBudget(options.includeBudget());
+        publication.setSelectionOptions(new com.fasterxml.jackson.databind.ObjectMapper().convertValue(options,new com.fasterxml.jackson.core.type.TypeReference<java.util.Map<String,Object>>(){}));
         // The request states the whole desired state, so an Update that omits
         // the flag unlists rather than silently keeping a public listing.
         publication.applyListing(request.safeListInExplore(), Instant.now());
@@ -265,6 +266,11 @@ public class TripPublicationService {
     /** Make a private editable copy using only the frozen, public snapshot. */
     @Transactional
     public TripResponse copySharedPlan(String token, UUID userId) {
+        return copySharedPlan(token,userId,null);
+    }
+
+    @Transactional
+    public TripResponse copySharedPlan(String token, UUID userId,com.navio.tripplanningservice.dto.publication.CopyPlanRequest request) {
         TripPublication publication = publicationRepository
                 .findByTokenAndStatus(token, TripPublication.PublicationStatus.ACTIVE)
                 .filter(TripPublication::isListed)
@@ -278,7 +284,11 @@ public class TripPublicationService {
                 .findFirst().orElse(null);
         String destination = publicPlan.destinationCity() == null || publicPlan.destinationCity().isBlank()
                 ? "Shared trip" : publicPlan.destinationCity();
-        LocalDate start = LocalDate.now();
+        LocalDate originalStart=publicPlan.startDate()!=null?publicPlan.startDate():publicDays.stream().map(com.navio.tripplanningservice.dto.publication.PublicDayDto::date).filter(Objects::nonNull).min(LocalDate::compareTo).orElse(null);
+        if(request!=null&&!java.util.Set.of("retain","change").contains(Objects.requireNonNullElse(request.dateMode(),"")))throw new com.navio.tripplanningservice.service.PlannerService.PlannerValidationException("Choose whether to retain or change trip dates");
+        if(request!=null&&"retain".equals(request.dateMode())&&originalStart==null)throw new com.navio.tripplanningservice.service.PlannerService.PlannerValidationException("This plan has no shared dates; choose a start date");
+        LocalDate start=request==null?LocalDate.now():"retain".equals(request.dateMode())?originalStart:request.startDate();
+        if(start==null)throw new com.navio.tripplanningservice.service.PlannerService.PlannerValidationException("Choose a start date");
         int dayCount = Math.max(1, publicPlan.dayCount());
         Trip copy = Trip.builder()
                 .userId(userId)
@@ -293,34 +303,53 @@ public class TripPublicationService {
                 .destinationCountry(publicPlan.destinationCountry())
                 .visibility(com.navio.tripplanningservice.model.TripVisibility.PRIVATE)
                 .build();
+        long span=originalStart==null?dayCount-1:publicDays.stream().filter(d->d.date()!=null).mapToLong(d->java.time.temporal.ChronoUnit.DAYS.between(originalStart,d.date())).max().orElse(dayCount-1);
+        if(originalStart!=null&&publicPlan.endDate()!=null){
+            long declaredSpan=java.time.temporal.ChronoUnit.DAYS.between(originalStart,publicPlan.endDate());
+            if(declaredSpan<0)throw new com.navio.tripplanningservice.service.PlannerService.PlannerValidationException("Invalid published date range");
+            span=Math.max(span,declaredSpan);
+        }
+        if(span<0||span>3660)throw new com.navio.tripplanningservice.service.PlannerService.PlannerValidationException("Invalid published date range");
+        copy.setEndDate(start.plusDays(Math.max(span,dayCount-1)));
         copy = tripRepository.saveAndFlush(copy);
 
         List<PlannerBlockDto> blocks = new ArrayList<>();
+        java.util.Map<String,String> itemIds=new java.util.HashMap<>();
+        if(publicPlan.startingPart()!=null){
+            var part=publicPlan.startingPart();
+            var note=new PlannerItemDto("copied-intro-"+UUID.randomUUID(),"note",null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,part.content(),null,null);
+            blocks.add(new PlannerBlockDto("starting-part-"+UUID.randomUUID(),"list",Objects.requireNonNullElse(part.title(),"Before you go"),start,"teal",List.of(note)));
+        }
+        for(var list:publicPlan.lists()==null?List.<com.navio.tripplanningservice.dto.publication.PublicDayDto>of():publicPlan.lists()){
+            var items=new ArrayList<PlannerItemDto>();
+            for(var item:list.items()==null?List.<PublicItemDto>of():list.items()){var copied=copyPublishedItem(item);if(copied!=null){items.add(copied);if(item.id()!=null)itemIds.put(item.id(),copied.id());}}
+            blocks.add(new PlannerBlockDto("copied-list-"+UUID.randomUUID(),"list",Objects.requireNonNullElse(list.title(),"My List"),start,Objects.requireNonNullElse(list.colorId(),"teal"),items));
+        }
         int dayIndex = 0;
         for (var publicDay : publicDays) {
-            LocalDate day = start.plusDays(dayIndex);
+            LocalDate day = start.plusDays(originalStart!=null&&publicDay.date()!=null?java.time.temporal.ChronoUnit.DAYS.between(originalStart,publicDay.date()):dayIndex);
             List<PlannerItemDto> items = new ArrayList<>();
             for (PublicItemDto item : publicDay.items() == null ? List.<PublicItemDto>of() : publicDay.items()) {
                 PlannerItemDto copied = copyPublishedItem(item);
-                if (copied != null) items.add(copied);
+                if (copied != null) { items.add(copied); if(item.id()!=null)itemIds.put(item.id(),copied.id()); }
             }
             blocks.add(new PlannerBlockDto(
-                    "copied-day-" + UUID.randomUUID(), "itinerary", day.toString(), day,
-                    "teal", items));
+                    "copied-day-" + UUID.randomUUID(), "itinerary", Objects.requireNonNullElse(publicDay.title(),publicDay.label()), day,
+                    Objects.requireNonNullElse(publicDay.colorId(),"teal"), items));
             dayIndex++;
         }
 
         PlannerBudgetDto budget = null;
         if (publicPlan.budget() != null) {
             var sharedBudget = publicPlan.budget();
-            List<PlannerExpenseDto> expenses = sharedBudget.expenses().stream()
-                    .map(expense -> new PlannerExpenseDto("copied-expense-" + UUID.randomUUID(),
+            List<PlannerExpenseDto> expenses = (sharedBudget.expenses()==null?List.<com.navio.tripplanningservice.dto.publication.PublicBudgetDto.PublicExpenseDto>of():sharedBudget.expenses()).stream()
+                    .map(expense -> new PlannerExpenseDto((expense.itemRef()!=null&&itemIds.containsKey(expense.itemRef())?"place-expense-"+java.net.URLEncoder.encode(itemIds.get(expense.itemRef()),java.nio.charset.StandardCharsets.UTF_8)+"/":"copied-expense-")+UUID.randomUUID(),
                             expense.amount(), expense.label(), expense.categoryId(), null))
                     .toList();
             budget = new PlannerBudgetDto(sharedBudget.currency(), sharedBudget.amount(), expenses);
         }
         plannerService.savePlannerSnapshot(copy.getId(), userId,
-                new PlannerSnapshotRequest(copy.getVersion(), blocks, budget));
+                new PlannerSnapshotRequest(copy.getVersion(), blocks, budget, PublishedGarage.copy(publicPlan.garage())));
         copyEvents.recordSuccessfulCopy(publication.getId(), copy.getId(), userId);
         return tripService.getTripById(copy.getId(), userId);
     }
@@ -349,10 +378,11 @@ public class TripPublicationService {
                             null, null, null, null, item.placeType(),
                             PublishedTransport.mode(item.arrivalMode()) == null ? null : com.fasterxml.jackson.databind.node.TextNode.valueOf(item.arrivalMode()),
                             PublishedTransport.transit(item.arrivalMode()) && PublishedTransport.routeKey(item.arrivalRouteKey()) != null
-                                    ? com.fasterxml.jackson.databind.node.TextNode.valueOf(item.arrivalRouteKey()) : null)
+                                    ? com.fasterxml.jackson.databind.node.TextNode.valueOf(item.arrivalRouteKey()) : null, item.timeSource(),
+                            item.schedule()==null?null:item.schedule().stream().map(moment->new com.navio.tripplanningservice.dto.PlannerScheduleEntryDto("moment-"+UUID.randomUUID(),moment.time(),moment.timeEnd(),moment.label())).toList())
                     : new PlannerItemDto(id, "note", null, null, null, null, null, null,
                             null, null, null, null, null, null, null, null, null,
-                            "Stop to locate: " + (item.name() == null ? "Unnamed stop" : item.name()), null, null);
+                            "## Stop to locate: " + (item.name() == null ? "Unnamed stop" : item.name())+"\n\n"+Objects.requireNonNullElse(item.description(),"")+"\n\n"+Objects.requireNonNullElse(item.notes(),"")+"\n\n"+Objects.requireNonNullElse(item.time(),"")+(item.timeEnd()==null?"":" - "+item.timeEnd())+(item.schedule()==null?"":"\n"+item.schedule().stream().map(moment->moment.time()+" "+moment.label()).collect(java.util.stream.Collectors.joining("\n"))), null, null);
             case "note" -> new PlannerItemDto(id, "note", null, null, null, null, null, null,
                             null, null, null, null, null, null, null, null, null,
                             item.noteContent(), null, null);
@@ -370,7 +400,7 @@ public class TripPublicationService {
         if (charger == null) return null;
         return new PlannerEvChargerDto(charger.connectorTypes(), charger.maxKw(),
                 charger.totalConnectors(), null, charger.priceText(),
-                charger.openingHoursSummary(), 0, charger.operatorName(), "MANUAL", false, null);
+                charger.openingHoursSummary(), null, charger.operatorName(), "MANUAL", false, null);
     }
 
     private void requireExpectedRevision(Optional<TripPublication> existing, Integer expectedRevision) {
@@ -393,10 +423,7 @@ public class TripPublicationService {
         return new PublicationResponse(
                 true,
                 publication.getToken(),
-                new PublicationOptions(
-                        Boolean.TRUE.equals(publication.getIncludeDates()),
-                        Boolean.TRUE.equals(publication.getIncludeNotes()),
-                        Boolean.TRUE.equals(publication.getIncludeBudget())),
+                publication.getSelectionOptions()==null ? new PublicationOptions(Boolean.TRUE.equals(publication.getIncludeDates()),Boolean.TRUE.equals(publication.getIncludeNotes()),Boolean.TRUE.equals(publication.getIncludeBudget())) : new com.fasterxml.jackson.databind.ObjectMapper().convertValue(publication.getSelectionOptions(),PublicationOptions.class),
                 publication.getRevision(),
                 publication.getPublishedAt(),
                 publication.getUpdatedAt(),

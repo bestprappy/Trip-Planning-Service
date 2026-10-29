@@ -89,6 +89,12 @@ public class Trip {
     @Column(columnDefinition = "jsonb")
     private java.util.List<String> garageVehicleIds;
 
+    /** Frozen selected vehicle descriptors; imported entries belong only to this trip. */
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
+    @Column(columnDefinition = "jsonb")
+    private java.util.List<java.util.Map<String,Object>> tripVehicles;
+
+
     @Version
     @Column(nullable = false)
     private Long version;

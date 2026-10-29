@@ -19,7 +19,9 @@ public record PublicBudgetDto(
     public record PublicExpenseDto(
             String label,
             BigDecimal amount,
-            String categoryId
+            String categoryId,
+            String itemRef
     ) {
+        public PublicExpenseDto(String label,BigDecimal amount,String categoryId){this(label,amount,categoryId,null);}
     }
 }

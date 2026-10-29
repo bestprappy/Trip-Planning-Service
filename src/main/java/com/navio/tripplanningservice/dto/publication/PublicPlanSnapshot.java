@@ -31,6 +31,13 @@ public record PublicPlanSnapshot(
         int dayCount,
         List<PublicDayDto> days,
         PublicBudgetDto budget,
-        PublicationOptions included
+        PublicationOptions included,
+        PublicStartingPartDto startingPart,
+        List<PublicDayDto> lists,
+        List<com.fasterxml.jackson.databind.JsonNode> garage
 ) {
+    public PublicPlanSnapshot(int version,String title,String city,String country,LocalDate start,LocalDate end,int count,
+        List<PublicDayDto> days,PublicBudgetDto budget,PublicationOptions included){
+        this(version,title,city,country,start,end,count,days,budget,included,null,null,null);
+    }
 }

@@ -1,0 +1,2107 @@
+[
+  {
+    "key": "slow",
+    "label": "Kyoto, at an unhurried pace",
+    "shared": {
+      "publishedAt": "2026-10-29",
+      "listedInExplore": true,
+      "authorName": "Navio review example",
+      "plan": {
+        "sanitizerVersion": 1,
+        "title": "Kyoto, at an unhurried pace",
+        "destinationCity": "Kyoto",
+        "destinationCountry": "Japan",
+        "dayCount": 3,
+        "budget": {
+          "currency": "JPY",
+          "amount": 32000,
+          "expenses": [
+            {
+              "label": "Food",
+              "amount": 12000
+            },
+            {
+              "label": "Transport",
+              "amount": 8000
+            },
+            {
+              "label": "Activities",
+              "amount": 12000,
+              "categoryId": "activities",
+              "itemRef": "review-day-0-0"
+            }
+          ]
+        },
+        "days": [
+          {
+            "label": "Day 1",
+            "title": "Quiet paths & the old city",
+            "items": [
+              {
+                "type": "place",
+                "name": "Fushimi Inari Taisha",
+                "placeId": "preview:fushimi",
+                "lat": 34.9671,
+                "lng": 135.7727,
+                "imageUrl": "/images/plan-covers/kyoto.webp",
+                "description": "A walk through wooded paths and rows of vermilion torii.",
+                "notes": "Go early if you enjoy a quieter walk. We left plenty of room in the morning rather than trying to see everything in one day.",
+                "time": "08:30",
+                "timeEnd": "10:00",
+                "id": "review-day-0-0",
+                "schedule": [
+                  {
+                    "id": "arrival",
+                    "time": "09:00",
+                    "timeEnd": "09:10",
+                    "label": "Arrive and get oriented"
+                  },
+                  {
+                    "id": "visit",
+                    "time": "09:10",
+                    "timeEnd": "10:00",
+                    "label": "Time to explore"
+                  }
+                ]
+              },
+              {
+                "type": "place",
+                "name": "Kiyomizu-dera",
+                "placeId": "preview:kiyomizu",
+                "lat": 34.9949,
+                "lng": 135.785,
+                "notes": "Take your time on the walk up. The little streets are part of the visit.",
+                "time": "11:30",
+                "id": "review-day-0-1",
+                "arrivalMode": "walk"
+              },
+              {
+                "type": "note",
+                "noteContent": "Leave the afternoon flexible. It is a trip, not a checklist.",
+                "id": "review-day-0-2"
+              },
+              {
+                "type": "place",
+                "name": "Gion",
+                "placeId": "preview:gion",
+                "lat": 35.003,
+                "lng": 135.778,
+                "notes": "An evening walk, then dinner somewhere nearby. Respect the private lanes and local signs.",
+                "time": "17:00",
+                "id": "review-day-0-3",
+                "arrivalMode": "walk"
+              }
+            ],
+            "date": "2027-03-10",
+            "colorId": "teal"
+          },
+          {
+            "label": "Day 2",
+            "title": "A slower day by the hills",
+            "items": [
+              {
+                "type": "place",
+                "name": "Arashiyama",
+                "placeId": "preview:arashiyama",
+                "lat": 35.0094,
+                "lng": 135.6668,
+                "description": "Make space for a longer walk and an unhurried lunch.",
+                "time": "09:00",
+                "id": "review-day-1-0",
+                "notes": "Keep this stop flexible and check current visitor information.",
+                "schedule": [
+                  {
+                    "id": "arrival",
+                    "time": "09:00",
+                    "timeEnd": "09:10",
+                    "label": "Arrive and get oriented"
+                  },
+                  {
+                    "id": "visit",
+                    "time": "09:10",
+                    "timeEnd": "10:00",
+                    "label": "Time to explore"
+                  }
+                ]
+              },
+              {
+                "type": "charger",
+                "name": "Charging stop (preview)",
+                "placeId": "preview:charger",
+                "lat": 35.011,
+                "lng": 135.681,
+                "charger": {
+                  "maxKw": 50,
+                  "connectorTypes": [
+                    "CHAdeMO"
+                  ],
+                  "openingHoursSummary": "Example only · verify before traveling",
+                  "priceText": "Check the operator’s current pricing"
+                },
+                "notes": "This demonstrates how the shared charging-stop card will look; it is not a verified charging location.",
+                "id": "review-day-1-1"
+              },
+              {
+                "type": "checklist",
+                "checklistTitle": "Before setting out",
+                "checklistLabels": [
+                  "Water for the walk",
+                  "Check charging access",
+                  "Leave time for a break"
+                ],
+                "id": "review-day-1-2"
+              }
+            ],
+            "date": "2027-03-11",
+            "colorId": "amber"
+          },
+          {
+            "label": "Day 3",
+            "title": "Return to a favorite",
+            "items": [
+              {
+                "type": "place",
+                "name": "Fushimi Inari Taisha",
+                "placeId": "preview:fushimi",
+                "lat": 34.9671,
+                "lng": 135.7727,
+                "imageUrl": "/images/plan-covers/kyoto.webp",
+                "notes": "We kept this return visit optional. Revisiting a favorite can be better than adding another stop.",
+                "id": "review-day-2-0",
+                "schedule": [
+                  {
+                    "id": "arrival",
+                    "time": "09:00",
+                    "timeEnd": "09:10",
+                    "label": "Arrive and get oriented"
+                  },
+                  {
+                    "id": "visit",
+                    "time": "09:10",
+                    "timeEnd": "10:00",
+                    "label": "Time to explore"
+                  }
+                ]
+              },
+              {
+                "type": "place",
+                "name": "A café to decide later",
+                "notes": "An example of a stop whose location has not been shared.",
+                "id": "review-day-2-1",
+                "arrivalMode": "drive"
+              }
+            ],
+            "date": "2027-03-12",
+            "colorId": "rose"
+          }
+        ],
+        "startDate": "2027-03-10",
+        "endDate": "2027-03-12",
+        "startingPart": {
+          "title": "A little room to wander",
+          "content": "Three days with breathing room. The stops are a starting point, and the spaces between them are part of the trip.\n\n## Before you go\n- Keep one afternoon flexible.\n- Check the official opening times before setting out.\n- Use the saved ideas when you have extra time.\n\n### Make it yours\nChange the dates, reorder a stop or return to your saved ideas. [Read Navio help](/help)."
+        },
+        "lists": [
+          {
+            "label": "My List",
+            "title": "If there is a little extra time",
+            "colorId": "indigo",
+            "items": [
+              {
+                "type": "note",
+                "noteContent": "## If there is a little extra time\nKeep these as possibilities rather than extra obligations."
+              },
+              {
+                "type": "checklist",
+                "checklistTitle": "Before leaving",
+                "checklistLabels": [
+                  "Keep one afternoon flexible.",
+                  "Check the official opening times before setting out.",
+                  "Use the saved ideas when you have extra time."
+                ]
+              },
+              {
+                "type": "place",
+                "id": "optional-visit",
+                "name": "Nishiki Market",
+                "placeId": "preview:nishiki",
+                "lat": 35.005,
+                "lng": 135.7649,
+                "notes": "An optional idea from the example list, not a scheduled visit."
+              }
+            ]
+          }
+        ],
+        "garage": [
+          {
+            "key": "review-catalogue",
+            "source": "catalog",
+            "active": true,
+            "vehicle": {
+              "nickname": null,
+              "make": "BYD",
+              "model": "ATTO 3",
+              "year": 2026,
+              "batteryCapacityKwh": 60.48,
+              "rangeKm": 480,
+              "consumptionKwhPer100km": null,
+              "connectorTypes": [
+                "TYPE2",
+                "CCS2"
+              ],
+              "settings": {
+                "maxAcKw": 7,
+                "maxDcKw": 88,
+                "startingBatteryPct": 80,
+                "imageUrl": "/images/vehicles/byd-atto-3.png"
+              },
+              "catalog": {
+                "id": "th-byd-atto-3-extended-2026",
+                "make": "BYD",
+                "model": "ATTO 3",
+                "trim": "Extended",
+                "year": 2026,
+                "market": "TH",
+                "batteryCapacityKwh": 60.48,
+                "batteryCapacityBasis": "MANUFACTURER_DECLARED",
+                "rangeKm": 480,
+                "rangeStandard": "NEDC",
+                "connectorTypes": [
+                  "TYPE2",
+                  "CCS2"
+                ],
+                "maxAcKw": 7,
+                "maxDcKw": 88,
+                "imageUrl": "/images/vehicles/byd-atto-3.png",
+                "sourceUrl": "https://www.reverautomotive.com/media/models/new-atto3/brochure/bydatto3_MY2026.pdf",
+                "verifiedAt": "2026-09-12"
+              },
+              "energyProfile": {
+                "version": 1,
+                "modelKind": "RATED_RANGE",
+                "selectionMode": "CATALOG_DEFAULT",
+                "consumptionKwhPer100km": null,
+                "consumptionSource": "UNKNOWN",
+                "consumptionMeasurementBasis": "UNKNOWN",
+                "consumptionStandard": "NONE",
+                "sourceUrl": null,
+                "usableBatteryCapacityKwh": null,
+                "capacityBasis": "MANUFACTURER_DECLARED_UNSPECIFIED",
+                "ratedRangeKm": 480,
+                "ratedRangeStandard": "NEDC"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "source": {
+      "blocks": [
+        {
+          "id": "starting-part-review",
+          "kind": "list",
+          "title": "A little room to wander",
+          "date": "2027-03-10",
+          "colorId": "teal",
+          "items": [
+            {
+              "id": "review-item-0-0",
+              "type": "note",
+              "content": "Three days with breathing room. The stops are a starting point, and the spaces between them are part of the trip.\n\n## Before you go\n- Keep one afternoon flexible.\n- Check the official opening times before setting out.\n- Use the saved ideas when you have extra time.\n\n### Make it yours\nChange the dates, reorder a stop or return to your saved ideas. [Read Navio help](/help)."
+            }
+          ]
+        },
+        {
+          "id": "review-list-0",
+          "kind": "list",
+          "title": "If there is a little extra time",
+          "date": "2027-03-10",
+          "colorId": "indigo",
+          "items": [
+            {
+              "id": "review-item-1-0",
+              "type": "note",
+              "content": "## If there is a little extra time\nKeep these as possibilities rather than extra obligations."
+            },
+            {
+              "id": "review-item-1-1",
+              "type": "checklist",
+              "title": "Before leaving",
+              "items": [
+                {
+                  "id": "shared-day-1-item-2-check-0",
+                  "label": "Keep one afternoon flexible.",
+                  "checked": false
+                },
+                {
+                  "id": "shared-day-1-item-2-check-1",
+                  "label": "Check the official opening times before setting out.",
+                  "checked": false
+                },
+                {
+                  "id": "shared-day-1-item-2-check-2",
+                  "label": "Use the saved ideas when you have extra time.",
+                  "checked": false
+                }
+              ]
+            },
+            {
+              "id": "review-item-1-2",
+              "type": "place",
+              "placeId": "preview:nishiki",
+              "name": "Nishiki Market",
+              "address": "",
+              "lat": 35.005,
+              "lng": 135.7649,
+              "notes": "An optional idea from the example list, not a scheduled visit."
+            }
+          ]
+        },
+        {
+          "id": "review-day-0",
+          "kind": "itinerary",
+          "title": "Quiet paths & the old city",
+          "date": "2027-03-10",
+          "colorId": "teal",
+          "items": [
+            {
+              "id": "review-item-2-0",
+              "type": "place",
+              "placeId": "preview:fushimi",
+              "name": "Fushimi Inari Taisha",
+              "description": "A walk through wooded paths and rows of vermilion torii.",
+              "address": "",
+              "lat": 34.9671,
+              "lng": 135.7727,
+              "schedule": [
+                {
+                  "id": "arrival",
+                  "time": "09:00",
+                  "timeEnd": "09:10",
+                  "label": "Arrive and get oriented"
+                },
+                {
+                  "id": "visit",
+                  "time": "09:10",
+                  "timeEnd": "10:00",
+                  "label": "Time to explore"
+                }
+              ],
+              "imageUrl": "/images/plan-covers/kyoto.webp",
+              "notes": "Go early if you enjoy a quieter walk. We left plenty of room in the morning rather than trying to see everything in one day.",
+              "time": "08:30",
+              "timeEnd": "10:00"
+            },
+            {
+              "id": "review-item-2-1",
+              "type": "place",
+              "placeId": "preview:kiyomizu",
+              "name": "Kiyomizu-dera",
+              "address": "",
+              "lat": 34.9949,
+              "lng": 135.785,
+              "notes": "Take your time on the walk up. The little streets are part of the visit.",
+              "time": "11:30",
+              "arrivalMode": "walk"
+            },
+            {
+              "id": "review-item-2-2",
+              "type": "note",
+              "content": "Leave the afternoon flexible. It is a trip, not a checklist."
+            },
+            {
+              "id": "review-item-2-3",
+              "type": "place",
+              "placeId": "preview:gion",
+              "name": "Gion",
+              "address": "",
+              "lat": 35.003,
+              "lng": 135.778,
+              "notes": "An evening walk, then dinner somewhere nearby. Respect the private lanes and local signs.",
+              "time": "17:00",
+              "arrivalMode": "walk"
+            }
+          ]
+        },
+        {
+          "id": "review-day-1",
+          "kind": "itinerary",
+          "title": "A slower day by the hills",
+          "date": "2027-03-11",
+          "colorId": "amber",
+          "items": [
+            {
+              "id": "review-item-3-0",
+              "type": "place",
+              "placeId": "preview:arashiyama",
+              "name": "Arashiyama",
+              "description": "Make space for a longer walk and an unhurried lunch.",
+              "address": "",
+              "lat": 35.0094,
+              "lng": 135.6668,
+              "schedule": [
+                {
+                  "id": "arrival",
+                  "time": "09:00",
+                  "timeEnd": "09:10",
+                  "label": "Arrive and get oriented"
+                },
+                {
+                  "id": "visit",
+                  "time": "09:10",
+                  "timeEnd": "10:00",
+                  "label": "Time to explore"
+                }
+              ],
+              "notes": "Keep this stop flexible and check current visitor information.",
+              "time": "09:00"
+            },
+            {
+              "id": "review-item-3-1",
+              "type": "place",
+              "placeId": "ev-charger:preview:charger",
+              "name": "Charging stop (preview)",
+              "address": "",
+              "lat": 35.011,
+              "lng": 135.681,
+              "notes": "This demonstrates how the shared charging-stop card will look; it is not a verified charging location.",
+              "evCharger": {
+                "connectorTypes": [],
+                "maxKw": 50,
+                "totalConnectors": 0,
+                "availableConnectors": null,
+                "priceText": "Check the operator’s current pricing",
+                "openingHoursSummary": "Example only · verify before traveling",
+                "estimatedChargeMinutes": null,
+                "operatorName": null
+              }
+            },
+            {
+              "id": "review-item-3-2",
+              "type": "checklist",
+              "title": "Before setting out",
+              "items": [
+                {
+                  "id": "shared-day-2-item-3-check-0",
+                  "label": "Water for the walk",
+                  "checked": false
+                },
+                {
+                  "id": "shared-day-2-item-3-check-1",
+                  "label": "Check charging access",
+                  "checked": false
+                },
+                {
+                  "id": "shared-day-2-item-3-check-2",
+                  "label": "Leave time for a break",
+                  "checked": false
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "review-day-2",
+          "kind": "itinerary",
+          "title": "Return to a favorite",
+          "date": "2027-03-12",
+          "colorId": "rose",
+          "items": [
+            {
+              "id": "review-item-4-0",
+              "type": "place",
+              "placeId": "preview:fushimi",
+              "name": "Fushimi Inari Taisha",
+              "address": "",
+              "lat": 34.9671,
+              "lng": 135.7727,
+              "schedule": [
+                {
+                  "id": "arrival",
+                  "time": "09:00",
+                  "timeEnd": "09:10",
+                  "label": "Arrive and get oriented"
+                },
+                {
+                  "id": "visit",
+                  "time": "09:10",
+                  "timeEnd": "10:00",
+                  "label": "Time to explore"
+                }
+              ],
+              "imageUrl": "/images/plan-covers/kyoto.webp",
+              "notes": "We kept this return visit optional. Revisiting a favorite can be better than adding another stop."
+            },
+            {
+              "id": "review-item-4-1",
+              "type": "note",
+              "content": "A café to decide later (location not shared)\n\nAn example of a stop whose location has not been shared."
+            }
+          ]
+        }
+      ],
+      "budget": {
+        "currency": "JPY",
+        "amount": 32000,
+        "expenses": [
+          {
+            "id": "shared-expense-1",
+            "amount": 12000,
+            "label": "Food",
+            "categoryId": "other"
+          },
+          {
+            "id": "shared-expense-2",
+            "amount": 8000,
+            "label": "Transport",
+            "categoryId": "other"
+          },
+          {
+            "id": "place-expense-review-item-2-0/2",
+            "amount": 12000,
+            "label": "Activities",
+            "categoryId": "activities"
+          }
+        ]
+      },
+      "energyState": {
+        "initialSocPct": 80,
+        "vehicleSnapshot": {
+          "version": 1,
+          "vehicleId": "a12405b7-a6b7-4bb3-a795-6cddd5d71f28",
+          "label": "BYD ATTO 3",
+          "profile": {
+            "version": 1,
+            "modelKind": "RATED_RANGE",
+            "selectionMode": "CATALOG_DEFAULT",
+            "consumptionKwhPer100km": null,
+            "consumptionSource": "UNKNOWN",
+            "consumptionMeasurementBasis": "UNKNOWN",
+            "consumptionStandard": "NONE",
+            "sourceUrl": null,
+            "usableBatteryCapacityKwh": null,
+            "capacityBasis": "MANUFACTURER_DECLARED_UNSPECIFIED",
+            "ratedRangeKm": 480,
+            "ratedRangeStandard": "NEDC"
+          },
+          "maxAcKw": 7,
+          "maxDcKw": 88,
+          "connectorTypes": [
+            "TYPE2",
+            "CCS2"
+          ],
+          "legacyConsumptionConfirmed": false
+        },
+        "garageVehicleIds": [
+          "a12405b7-a6b7-4bb3-a795-6cddd5d71f28"
+        ],
+        "vehicles": [
+          {
+            "scope": "trip",
+            "vehicle": {
+              "nickname": null,
+              "make": "BYD",
+              "model": "ATTO 3",
+              "year": 2026,
+              "batteryCapacityKwh": 60.48,
+              "rangeKm": 480,
+              "consumptionKwhPer100km": null,
+              "connectorTypes": [
+                "TYPE2",
+                "CCS2"
+              ],
+              "settings": {
+                "maxAcKw": 7,
+                "maxDcKw": 88,
+                "startingBatteryPct": 80,
+                "imageUrl": "/images/vehicles/byd-atto-3.png"
+              },
+              "catalog": {
+                "id": "th-byd-atto-3-extended-2026",
+                "make": "BYD",
+                "model": "ATTO 3",
+                "trim": "Extended",
+                "year": 2026,
+                "market": "TH",
+                "batteryCapacityKwh": 60.48,
+                "batteryCapacityBasis": "MANUFACTURER_DECLARED",
+                "rangeKm": 480,
+                "rangeStandard": "NEDC",
+                "connectorTypes": [
+                  "TYPE2",
+                  "CCS2"
+                ],
+                "maxAcKw": 7,
+                "maxDcKw": 88,
+                "imageUrl": "/images/vehicles/byd-atto-3.png",
+                "sourceUrl": "https://www.reverautomotive.com/media/models/new-atto3/brochure/bydatto3_MY2026.pdf",
+                "verifiedAt": "2026-09-12"
+              },
+              "energyProfile": {
+                "version": 1,
+                "modelKind": "RATED_RANGE",
+                "selectionMode": "CATALOG_DEFAULT",
+                "consumptionKwhPer100km": null,
+                "consumptionSource": "UNKNOWN",
+                "consumptionMeasurementBasis": "UNKNOWN",
+                "consumptionStandard": "NONE",
+                "sourceUrl": null,
+                "usableBatteryCapacityKwh": null,
+                "capacityBasis": "MANUFACTURER_DECLARED_UNSPECIFIED",
+                "ratedRangeKm": 480,
+                "ratedRangeStandard": "NEDC"
+              },
+              "id": "a12405b7-a6b7-4bb3-a795-6cddd5d71f28",
+              "isDefault": false,
+              "createdAt": "2026-10-29T08:25:05.263Z",
+              "updatedAt": "2026-10-29T08:25:05.263Z"
+            }
+          }
+        ]
+      },
+      "options": {
+        "includeDates": true,
+        "includeNotes": true,
+        "includeBudget": true,
+        "includeStartingPart": true,
+        "includeGarage": true,
+        "listIds": [
+          "review-list-0"
+        ],
+        "excludedVehicleIds": [],
+        "confirmedCustomVehicleIds": []
+      }
+    }
+  },
+  {
+    "key": "first-visit",
+    "label": "Kyoto, a first visit",
+    "shared": {
+      "publishedAt": "2026-10-29",
+      "listedInExplore": true,
+      "authorName": "Navio review example",
+      "plan": {
+        "sanitizerVersion": 1,
+        "title": "Kyoto, a first visit",
+        "destinationCity": "Kyoto",
+        "destinationCountry": "Japan",
+        "dayCount": 3,
+        "budget": {
+          "currency": "JPY",
+          "amount": 32000,
+          "expenses": [
+            {
+              "label": "Food",
+              "amount": 12000
+            },
+            {
+              "label": "Transport",
+              "amount": 8000
+            },
+            {
+              "label": "Activities",
+              "amount": 12000,
+              "categoryId": "activities",
+              "itemRef": "review-day-0-0"
+            }
+          ]
+        },
+        "days": [
+          {
+            "label": "Day 1",
+            "title": "Quiet paths & the old city",
+            "items": [
+              {
+                "type": "place",
+                "name": "Fushimi Inari Taisha",
+                "placeId": "preview:fushimi",
+                "lat": 34.9671,
+                "lng": 135.7727,
+                "imageUrl": "/images/plan-covers/kyoto.webp",
+                "description": "A walk through wooded paths and rows of vermilion torii.",
+                "notes": "Go early if you enjoy a quieter walk. We left plenty of room in the morning rather than trying to see everything in one day.",
+                "time": "08:30",
+                "timeEnd": "10:00",
+                "id": "review-day-0-0",
+                "schedule": [
+                  {
+                    "id": "arrival",
+                    "time": "09:00",
+                    "timeEnd": "09:10",
+                    "label": "Arrive and get oriented"
+                  },
+                  {
+                    "id": "visit",
+                    "time": "09:10",
+                    "timeEnd": "10:00",
+                    "label": "Time to explore"
+                  }
+                ]
+              },
+              {
+                "type": "place",
+                "name": "Kiyomizu-dera",
+                "placeId": "preview:kiyomizu",
+                "lat": 34.9949,
+                "lng": 135.785,
+                "notes": "Take your time on the walk up. The little streets are part of the visit.",
+                "time": "11:30",
+                "id": "review-day-0-1",
+                "arrivalMode": "walk"
+              },
+              {
+                "type": "note",
+                "noteContent": "Leave the afternoon flexible. It is a trip, not a checklist.",
+                "id": "review-day-0-2"
+              },
+              {
+                "type": "place",
+                "name": "Gion",
+                "placeId": "preview:gion",
+                "lat": 35.003,
+                "lng": 135.778,
+                "notes": "An evening walk, then dinner somewhere nearby. Respect the private lanes and local signs.",
+                "time": "17:00",
+                "id": "review-day-0-3",
+                "arrivalMode": "walk"
+              }
+            ],
+            "date": "2027-03-15",
+            "colorId": "teal"
+          },
+          {
+            "label": "Day 2",
+            "title": "A slower day by the hills",
+            "items": [
+              {
+                "type": "place",
+                "name": "Arashiyama",
+                "placeId": "preview:arashiyama",
+                "lat": 35.0094,
+                "lng": 135.6668,
+                "description": "Make space for a longer walk and an unhurried lunch.",
+                "time": "09:00",
+                "id": "review-day-1-0",
+                "notes": "Keep this stop flexible and check current visitor information.",
+                "schedule": [
+                  {
+                    "id": "arrival",
+                    "time": "09:00",
+                    "timeEnd": "09:10",
+                    "label": "Arrive and get oriented"
+                  },
+                  {
+                    "id": "visit",
+                    "time": "09:10",
+                    "timeEnd": "10:00",
+                    "label": "Time to explore"
+                  }
+                ]
+              },
+              {
+                "type": "charger",
+                "name": "Charging stop (preview)",
+                "placeId": "preview:charger",
+                "lat": 35.011,
+                "lng": 135.681,
+                "charger": {
+                  "maxKw": 50,
+                  "connectorTypes": [
+                    "CHAdeMO"
+                  ],
+                  "openingHoursSummary": "Example only · verify before traveling",
+                  "priceText": "Check the operator’s current pricing"
+                },
+                "notes": "This demonstrates how the shared charging-stop card will look; it is not a verified charging location.",
+                "id": "review-day-1-1"
+              },
+              {
+                "type": "checklist",
+                "checklistTitle": "Before setting out",
+                "checklistLabels": [
+                  "Water for the walk",
+                  "Check charging access",
+                  "Leave time for a break"
+                ],
+                "id": "review-day-1-2"
+              }
+            ],
+            "date": "2027-03-16",
+            "colorId": "amber"
+          },
+          {
+            "label": "Day 3",
+            "title": "Return to a favorite",
+            "items": [
+              {
+                "type": "place",
+                "name": "Fushimi Inari Taisha",
+                "placeId": "preview:fushimi",
+                "lat": 34.9671,
+                "lng": 135.7727,
+                "imageUrl": "/images/plan-covers/kyoto.webp",
+                "notes": "We kept this return visit optional. Revisiting a favorite can be better than adding another stop.",
+                "id": "review-day-2-0",
+                "schedule": [
+                  {
+                    "id": "arrival",
+                    "time": "09:00",
+                    "timeEnd": "09:10",
+                    "label": "Arrive and get oriented"
+                  },
+                  {
+                    "id": "visit",
+                    "time": "09:10",
+                    "timeEnd": "10:00",
+                    "label": "Time to explore"
+                  }
+                ]
+              },
+              {
+                "type": "place",
+                "name": "A café to decide later",
+                "notes": "An example of a stop whose location has not been shared.",
+                "id": "review-day-2-1",
+                "arrivalMode": "drive"
+              }
+            ],
+            "date": "2027-03-17",
+            "colorId": "rose"
+          }
+        ],
+        "startDate": "2027-03-15",
+        "endDate": "2027-03-17",
+        "startingPart": {
+          "title": "Before your first morning",
+          "content": "This example balances a few planned visits with an easy way to change your mind. Read the notes at each stop, then adapt the timing to your own pace.\n\n## Before you go\n- Choose the places you care about most.\n- Keep your transport and booking details together.\n- Review the route rather than trying to fit in every idea.\n\n### Make it yours\nChange the dates, reorder a stop or return to your saved ideas. [Read Navio help](/help)."
+        },
+        "lists": [
+          {
+            "label": "My List",
+            "title": "Useful ideas and reminders",
+            "colorId": "indigo",
+            "items": [
+              {
+                "type": "note",
+                "noteContent": "## Useful ideas and reminders\nKeep these as possibilities rather than extra obligations."
+              },
+              {
+                "type": "checklist",
+                "checklistTitle": "Before leaving",
+                "checklistLabels": [
+                  "Choose the places you care about most.",
+                  "Keep your transport and booking details together.",
+                  "Review the route rather than trying to fit in every idea."
+                ]
+              },
+              {
+                "type": "place",
+                "id": "optional-visit",
+                "name": "Nishiki Market",
+                "placeId": "preview:nishiki",
+                "lat": 35.005,
+                "lng": 135.7649,
+                "notes": "An optional idea from the example list, not a scheduled visit."
+              }
+            ]
+          }
+        ],
+        "garage": [
+          {
+            "key": "review-catalogue",
+            "source": "catalog",
+            "active": true,
+            "vehicle": {
+              "nickname": null,
+              "make": "BYD",
+              "model": "ATTO 3",
+              "year": 2026,
+              "batteryCapacityKwh": 60.48,
+              "rangeKm": 480,
+              "consumptionKwhPer100km": null,
+              "connectorTypes": [
+                "TYPE2",
+                "CCS2"
+              ],
+              "settings": {
+                "maxAcKw": 7,
+                "maxDcKw": 88,
+                "startingBatteryPct": 80,
+                "imageUrl": "/images/vehicles/byd-atto-3.png"
+              },
+              "catalog": {
+                "id": "th-byd-atto-3-extended-2026",
+                "make": "BYD",
+                "model": "ATTO 3",
+                "trim": "Extended",
+                "year": 2026,
+                "market": "TH",
+                "batteryCapacityKwh": 60.48,
+                "batteryCapacityBasis": "MANUFACTURER_DECLARED",
+                "rangeKm": 480,
+                "rangeStandard": "NEDC",
+                "connectorTypes": [
+                  "TYPE2",
+                  "CCS2"
+                ],
+                "maxAcKw": 7,
+                "maxDcKw": 88,
+                "imageUrl": "/images/vehicles/byd-atto-3.png",
+                "sourceUrl": "https://www.reverautomotive.com/media/models/new-atto3/brochure/bydatto3_MY2026.pdf",
+                "verifiedAt": "2026-09-12"
+              },
+              "energyProfile": {
+                "version": 1,
+                "modelKind": "RATED_RANGE",
+                "selectionMode": "CATALOG_DEFAULT",
+                "consumptionKwhPer100km": null,
+                "consumptionSource": "UNKNOWN",
+                "consumptionMeasurementBasis": "UNKNOWN",
+                "consumptionStandard": "NONE",
+                "sourceUrl": null,
+                "usableBatteryCapacityKwh": null,
+                "capacityBasis": "MANUFACTURER_DECLARED_UNSPECIFIED",
+                "ratedRangeKm": 480,
+                "ratedRangeStandard": "NEDC"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "source": {
+      "blocks": [
+        {
+          "id": "starting-part-review",
+          "kind": "list",
+          "title": "Before your first morning",
+          "date": "2027-03-15",
+          "colorId": "teal",
+          "items": [
+            {
+              "id": "review-item-0-0",
+              "type": "note",
+              "content": "This example balances a few planned visits with an easy way to change your mind. Read the notes at each stop, then adapt the timing to your own pace.\n\n## Before you go\n- Choose the places you care about most.\n- Keep your transport and booking details together.\n- Review the route rather than trying to fit in every idea.\n\n### Make it yours\nChange the dates, reorder a stop or return to your saved ideas. [Read Navio help](/help)."
+            }
+          ]
+        },
+        {
+          "id": "review-list-0",
+          "kind": "list",
+          "title": "Useful ideas and reminders",
+          "date": "2027-03-15",
+          "colorId": "indigo",
+          "items": [
+            {
+              "id": "review-item-1-0",
+              "type": "note",
+              "content": "## Useful ideas and reminders\nKeep these as possibilities rather than extra obligations."
+            },
+            {
+              "id": "review-item-1-1",
+              "type": "checklist",
+              "title": "Before leaving",
+              "items": [
+                {
+                  "id": "shared-day-1-item-2-check-0",
+                  "label": "Choose the places you care about most.",
+                  "checked": false
+                },
+                {
+                  "id": "shared-day-1-item-2-check-1",
+                  "label": "Keep your transport and booking details together.",
+                  "checked": false
+                },
+                {
+                  "id": "shared-day-1-item-2-check-2",
+                  "label": "Review the route rather than trying to fit in every idea.",
+                  "checked": false
+                }
+              ]
+            },
+            {
+              "id": "review-item-1-2",
+              "type": "place",
+              "placeId": "preview:nishiki",
+              "name": "Nishiki Market",
+              "address": "",
+              "lat": 35.005,
+              "lng": 135.7649,
+              "notes": "An optional idea from the example list, not a scheduled visit."
+            }
+          ]
+        },
+        {
+          "id": "review-day-0",
+          "kind": "itinerary",
+          "title": "Quiet paths & the old city",
+          "date": "2027-03-15",
+          "colorId": "teal",
+          "items": [
+            {
+              "id": "review-item-2-0",
+              "type": "place",
+              "placeId": "preview:fushimi",
+              "name": "Fushimi Inari Taisha",
+              "description": "A walk through wooded paths and rows of vermilion torii.",
+              "address": "",
+              "lat": 34.9671,
+              "lng": 135.7727,
+              "schedule": [
+                {
+                  "id": "arrival",
+                  "time": "09:00",
+                  "timeEnd": "09:10",
+                  "label": "Arrive and get oriented"
+                },
+                {
+                  "id": "visit",
+                  "time": "09:10",
+                  "timeEnd": "10:00",
+                  "label": "Time to explore"
+                }
+              ],
+              "imageUrl": "/images/plan-covers/kyoto.webp",
+              "notes": "Go early if you enjoy a quieter walk. We left plenty of room in the morning rather than trying to see everything in one day.",
+              "time": "08:30",
+              "timeEnd": "10:00"
+            },
+            {
+              "id": "review-item-2-1",
+              "type": "place",
+              "placeId": "preview:kiyomizu",
+              "name": "Kiyomizu-dera",
+              "address": "",
+              "lat": 34.9949,
+              "lng": 135.785,
+              "notes": "Take your time on the walk up. The little streets are part of the visit.",
+              "time": "11:30",
+              "arrivalMode": "walk"
+            },
+            {
+              "id": "review-item-2-2",
+              "type": "note",
+              "content": "Leave the afternoon flexible. It is a trip, not a checklist."
+            },
+            {
+              "id": "review-item-2-3",
+              "type": "place",
+              "placeId": "preview:gion",
+              "name": "Gion",
+              "address": "",
+              "lat": 35.003,
+              "lng": 135.778,
+              "notes": "An evening walk, then dinner somewhere nearby. Respect the private lanes and local signs.",
+              "time": "17:00",
+              "arrivalMode": "walk"
+            }
+          ]
+        },
+        {
+          "id": "review-day-1",
+          "kind": "itinerary",
+          "title": "A slower day by the hills",
+          "date": "2027-03-16",
+          "colorId": "amber",
+          "items": [
+            {
+              "id": "review-item-3-0",
+              "type": "place",
+              "placeId": "preview:arashiyama",
+              "name": "Arashiyama",
+              "description": "Make space for a longer walk and an unhurried lunch.",
+              "address": "",
+              "lat": 35.0094,
+              "lng": 135.6668,
+              "schedule": [
+                {
+                  "id": "arrival",
+                  "time": "09:00",
+                  "timeEnd": "09:10",
+                  "label": "Arrive and get oriented"
+                },
+                {
+                  "id": "visit",
+                  "time": "09:10",
+                  "timeEnd": "10:00",
+                  "label": "Time to explore"
+                }
+              ],
+              "notes": "Keep this stop flexible and check current visitor information.",
+              "time": "09:00"
+            },
+            {
+              "id": "review-item-3-1",
+              "type": "place",
+              "placeId": "ev-charger:preview:charger",
+              "name": "Charging stop (preview)",
+              "address": "",
+              "lat": 35.011,
+              "lng": 135.681,
+              "notes": "This demonstrates how the shared charging-stop card will look; it is not a verified charging location.",
+              "evCharger": {
+                "connectorTypes": [],
+                "maxKw": 50,
+                "totalConnectors": 0,
+                "availableConnectors": null,
+                "priceText": "Check the operator’s current pricing",
+                "openingHoursSummary": "Example only · verify before traveling",
+                "estimatedChargeMinutes": null,
+                "operatorName": null
+              }
+            },
+            {
+              "id": "review-item-3-2",
+              "type": "checklist",
+              "title": "Before setting out",
+              "items": [
+                {
+                  "id": "shared-day-2-item-3-check-0",
+                  "label": "Water for the walk",
+                  "checked": false
+                },
+                {
+                  "id": "shared-day-2-item-3-check-1",
+                  "label": "Check charging access",
+                  "checked": false
+                },
+                {
+                  "id": "shared-day-2-item-3-check-2",
+                  "label": "Leave time for a break",
+                  "checked": false
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "review-day-2",
+          "kind": "itinerary",
+          "title": "Return to a favorite",
+          "date": "2027-03-17",
+          "colorId": "rose",
+          "items": [
+            {
+              "id": "review-item-4-0",
+              "type": "place",
+              "placeId": "preview:fushimi",
+              "name": "Fushimi Inari Taisha",
+              "address": "",
+              "lat": 34.9671,
+              "lng": 135.7727,
+              "schedule": [
+                {
+                  "id": "arrival",
+                  "time": "09:00",
+                  "timeEnd": "09:10",
+                  "label": "Arrive and get oriented"
+                },
+                {
+                  "id": "visit",
+                  "time": "09:10",
+                  "timeEnd": "10:00",
+                  "label": "Time to explore"
+                }
+              ],
+              "imageUrl": "/images/plan-covers/kyoto.webp",
+              "notes": "We kept this return visit optional. Revisiting a favorite can be better than adding another stop."
+            },
+            {
+              "id": "review-item-4-1",
+              "type": "note",
+              "content": "A café to decide later (location not shared)\n\nAn example of a stop whose location has not been shared."
+            }
+          ]
+        }
+      ],
+      "budget": {
+        "currency": "JPY",
+        "amount": 32000,
+        "expenses": [
+          {
+            "id": "shared-expense-1",
+            "amount": 12000,
+            "label": "Food",
+            "categoryId": "other"
+          },
+          {
+            "id": "shared-expense-2",
+            "amount": 8000,
+            "label": "Transport",
+            "categoryId": "other"
+          },
+          {
+            "id": "place-expense-review-item-2-0/2",
+            "amount": 12000,
+            "label": "Activities",
+            "categoryId": "activities"
+          }
+        ]
+      },
+      "energyState": {
+        "initialSocPct": 80,
+        "vehicleSnapshot": {
+          "version": 1,
+          "vehicleId": "5fe4c584-1dd5-4220-9057-0fb3a9d6b37f",
+          "label": "BYD ATTO 3",
+          "profile": {
+            "version": 1,
+            "modelKind": "RATED_RANGE",
+            "selectionMode": "CATALOG_DEFAULT",
+            "consumptionKwhPer100km": null,
+            "consumptionSource": "UNKNOWN",
+            "consumptionMeasurementBasis": "UNKNOWN",
+            "consumptionStandard": "NONE",
+            "sourceUrl": null,
+            "usableBatteryCapacityKwh": null,
+            "capacityBasis": "MANUFACTURER_DECLARED_UNSPECIFIED",
+            "ratedRangeKm": 480,
+            "ratedRangeStandard": "NEDC"
+          },
+          "maxAcKw": 7,
+          "maxDcKw": 88,
+          "connectorTypes": [
+            "TYPE2",
+            "CCS2"
+          ],
+          "legacyConsumptionConfirmed": false
+        },
+        "garageVehicleIds": [
+          "5fe4c584-1dd5-4220-9057-0fb3a9d6b37f"
+        ],
+        "vehicles": [
+          {
+            "scope": "trip",
+            "vehicle": {
+              "nickname": null,
+              "make": "BYD",
+              "model": "ATTO 3",
+              "year": 2026,
+              "batteryCapacityKwh": 60.48,
+              "rangeKm": 480,
+              "consumptionKwhPer100km": null,
+              "connectorTypes": [
+                "TYPE2",
+                "CCS2"
+              ],
+              "settings": {
+                "maxAcKw": 7,
+                "maxDcKw": 88,
+                "startingBatteryPct": 80,
+                "imageUrl": "/images/vehicles/byd-atto-3.png"
+              },
+              "catalog": {
+                "id": "th-byd-atto-3-extended-2026",
+                "make": "BYD",
+                "model": "ATTO 3",
+                "trim": "Extended",
+                "year": 2026,
+                "market": "TH",
+                "batteryCapacityKwh": 60.48,
+                "batteryCapacityBasis": "MANUFACTURER_DECLARED",
+                "rangeKm": 480,
+                "rangeStandard": "NEDC",
+                "connectorTypes": [
+                  "TYPE2",
+                  "CCS2"
+                ],
+                "maxAcKw": 7,
+                "maxDcKw": 88,
+                "imageUrl": "/images/vehicles/byd-atto-3.png",
+                "sourceUrl": "https://www.reverautomotive.com/media/models/new-atto3/brochure/bydatto3_MY2026.pdf",
+                "verifiedAt": "2026-09-12"
+              },
+              "energyProfile": {
+                "version": 1,
+                "modelKind": "RATED_RANGE",
+                "selectionMode": "CATALOG_DEFAULT",
+                "consumptionKwhPer100km": null,
+                "consumptionSource": "UNKNOWN",
+                "consumptionMeasurementBasis": "UNKNOWN",
+                "consumptionStandard": "NONE",
+                "sourceUrl": null,
+                "usableBatteryCapacityKwh": null,
+                "capacityBasis": "MANUFACTURER_DECLARED_UNSPECIFIED",
+                "ratedRangeKm": 480,
+                "ratedRangeStandard": "NEDC"
+              },
+              "id": "5fe4c584-1dd5-4220-9057-0fb3a9d6b37f",
+              "isDefault": false,
+              "createdAt": "2026-10-29T08:25:05.268Z",
+              "updatedAt": "2026-10-29T08:25:05.268Z"
+            }
+          }
+        ]
+      },
+      "options": {
+        "includeDates": true,
+        "includeNotes": true,
+        "includeBudget": true,
+        "includeStartingPart": true,
+        "includeGarage": true,
+        "listIds": [
+          "review-list-0"
+        ],
+        "excludedVehicleIds": [],
+        "confirmedCustomVehicleIds": []
+      }
+    }
+  },
+  {
+    "key": "together",
+    "label": "Kyoto, a flexible trip together",
+    "shared": {
+      "publishedAt": "2026-10-29",
+      "listedInExplore": true,
+      "authorName": "Navio review example",
+      "plan": {
+        "sanitizerVersion": 1,
+        "title": "Kyoto, a flexible trip together",
+        "destinationCity": "Kyoto",
+        "destinationCountry": "Japan",
+        "dayCount": 3,
+        "budget": {
+          "currency": "JPY",
+          "amount": 32000,
+          "expenses": [
+            {
+              "label": "Food",
+              "amount": 12000
+            },
+            {
+              "label": "Transport",
+              "amount": 8000
+            },
+            {
+              "label": "Activities",
+              "amount": 12000,
+              "categoryId": "activities",
+              "itemRef": "review-day-0-0"
+            }
+          ]
+        },
+        "days": [
+          {
+            "label": "Day 1",
+            "title": "Quiet paths & the old city",
+            "items": [
+              {
+                "type": "place",
+                "name": "Fushimi Inari Taisha",
+                "placeId": "preview:fushimi",
+                "lat": 34.9671,
+                "lng": 135.7727,
+                "imageUrl": "/images/plan-covers/kyoto.webp",
+                "description": "A walk through wooded paths and rows of vermilion torii.",
+                "notes": "Go early if you enjoy a quieter walk. We left plenty of room in the morning rather than trying to see everything in one day.",
+                "time": "08:30",
+                "timeEnd": "10:00",
+                "id": "review-day-0-0",
+                "schedule": [
+                  {
+                    "id": "arrival",
+                    "time": "09:00",
+                    "timeEnd": "09:10",
+                    "label": "Arrive and get oriented"
+                  },
+                  {
+                    "id": "visit",
+                    "time": "09:10",
+                    "timeEnd": "10:00",
+                    "label": "Time to explore"
+                  }
+                ]
+              },
+              {
+                "type": "place",
+                "name": "Kiyomizu-dera",
+                "placeId": "preview:kiyomizu",
+                "lat": 34.9949,
+                "lng": 135.785,
+                "notes": "Take your time on the walk up. The little streets are part of the visit.",
+                "time": "11:30",
+                "id": "review-day-0-1",
+                "arrivalMode": "walk"
+              },
+              {
+                "type": "note",
+                "noteContent": "Leave the afternoon flexible. It is a trip, not a checklist.",
+                "id": "review-day-0-2"
+              },
+              {
+                "type": "place",
+                "name": "Gion",
+                "placeId": "preview:gion",
+                "lat": 35.003,
+                "lng": 135.778,
+                "notes": "An evening walk, then dinner somewhere nearby. Respect the private lanes and local signs.",
+                "time": "17:00",
+                "id": "review-day-0-3",
+                "arrivalMode": "walk"
+              }
+            ],
+            "date": "2027-03-20",
+            "colorId": "teal"
+          },
+          {
+            "label": "Day 2",
+            "title": "A slower day by the hills",
+            "items": [
+              {
+                "type": "place",
+                "name": "Arashiyama",
+                "placeId": "preview:arashiyama",
+                "lat": 35.0094,
+                "lng": 135.6668,
+                "description": "Make space for a longer walk and an unhurried lunch.",
+                "time": "09:00",
+                "id": "review-day-1-0",
+                "notes": "Keep this stop flexible and check current visitor information.",
+                "schedule": [
+                  {
+                    "id": "arrival",
+                    "time": "09:00",
+                    "timeEnd": "09:10",
+                    "label": "Arrive and get oriented"
+                  },
+                  {
+                    "id": "visit",
+                    "time": "09:10",
+                    "timeEnd": "10:00",
+                    "label": "Time to explore"
+                  }
+                ]
+              },
+              {
+                "type": "charger",
+                "name": "Charging stop (preview)",
+                "placeId": "preview:charger",
+                "lat": 35.011,
+                "lng": 135.681,
+                "charger": {
+                  "maxKw": 50,
+                  "connectorTypes": [
+                    "CHAdeMO"
+                  ],
+                  "openingHoursSummary": "Example only · verify before traveling",
+                  "priceText": "Check the operator’s current pricing"
+                },
+                "notes": "This demonstrates how the shared charging-stop card will look; it is not a verified charging location.",
+                "id": "review-day-1-1"
+              },
+              {
+                "type": "checklist",
+                "checklistTitle": "Before setting out",
+                "checklistLabels": [
+                  "Water for the walk",
+                  "Check charging access",
+                  "Leave time for a break"
+                ],
+                "id": "review-day-1-2"
+              }
+            ],
+            "date": "2027-03-21",
+            "colorId": "amber"
+          },
+          {
+            "label": "Day 3",
+            "title": "Return to a favorite",
+            "items": [
+              {
+                "type": "place",
+                "name": "Fushimi Inari Taisha",
+                "placeId": "preview:fushimi",
+                "lat": 34.9671,
+                "lng": 135.7727,
+                "imageUrl": "/images/plan-covers/kyoto.webp",
+                "notes": "We kept this return visit optional. Revisiting a favorite can be better than adding another stop.",
+                "id": "review-day-2-0",
+                "schedule": [
+                  {
+                    "id": "arrival",
+                    "time": "09:00",
+                    "timeEnd": "09:10",
+                    "label": "Arrive and get oriented"
+                  },
+                  {
+                    "id": "visit",
+                    "time": "09:10",
+                    "timeEnd": "10:00",
+                    "label": "Time to explore"
+                  }
+                ]
+              },
+              {
+                "type": "place",
+                "name": "A café to decide later",
+                "notes": "An example of a stop whose location has not been shared.",
+                "id": "review-day-2-1",
+                "arrivalMode": "drive"
+              }
+            ],
+            "date": "2027-03-22",
+            "colorId": "rose"
+          }
+        ],
+        "startDate": "2027-03-20",
+        "endDate": "2027-03-22",
+        "startingPart": {
+          "title": "A plan everyone can make their own",
+          "content": "A shared outline for travelling together. The list below holds optional ideas, while the itinerary gives the group a simple daily structure.\n\n## Before you go\n- Agree on the must-sees before booking.\n- Leave room for a break and a change of plans.\n- Confirm current access and charging information independently.\n\n### Make it yours\nChange the dates, reorder a stop or return to your saved ideas. [Read Navio help](/help)."
+        },
+        "lists": [
+          {
+            "label": "My List",
+            "title": "Group ideas",
+            "colorId": "indigo",
+            "items": [
+              {
+                "type": "note",
+                "noteContent": "## Group ideas\nKeep these as possibilities rather than extra obligations."
+              },
+              {
+                "type": "checklist",
+                "checklistTitle": "Before leaving",
+                "checklistLabels": [
+                  "Agree on the must-sees before booking.",
+                  "Leave room for a break and a change of plans.",
+                  "Confirm current access and charging information independently."
+                ]
+              },
+              {
+                "type": "place",
+                "id": "optional-visit",
+                "name": "Nishiki Market",
+                "placeId": "preview:nishiki",
+                "lat": 35.005,
+                "lng": 135.7649,
+                "notes": "An optional idea from the example list, not a scheduled visit."
+              }
+            ]
+          }
+        ],
+        "garage": [
+          {
+            "key": "review-catalogue",
+            "source": "catalog",
+            "active": true,
+            "vehicle": {
+              "nickname": null,
+              "make": "BYD",
+              "model": "ATTO 3",
+              "year": 2026,
+              "batteryCapacityKwh": 60.48,
+              "rangeKm": 480,
+              "consumptionKwhPer100km": null,
+              "connectorTypes": [
+                "TYPE2",
+                "CCS2"
+              ],
+              "settings": {
+                "maxAcKw": 7,
+                "maxDcKw": 88,
+                "startingBatteryPct": 80,
+                "imageUrl": "/images/vehicles/byd-atto-3.png"
+              },
+              "catalog": {
+                "id": "th-byd-atto-3-extended-2026",
+                "make": "BYD",
+                "model": "ATTO 3",
+                "trim": "Extended",
+                "year": 2026,
+                "market": "TH",
+                "batteryCapacityKwh": 60.48,
+                "batteryCapacityBasis": "MANUFACTURER_DECLARED",
+                "rangeKm": 480,
+                "rangeStandard": "NEDC",
+                "connectorTypes": [
+                  "TYPE2",
+                  "CCS2"
+                ],
+                "maxAcKw": 7,
+                "maxDcKw": 88,
+                "imageUrl": "/images/vehicles/byd-atto-3.png",
+                "sourceUrl": "https://www.reverautomotive.com/media/models/new-atto3/brochure/bydatto3_MY2026.pdf",
+                "verifiedAt": "2026-09-12"
+              },
+              "energyProfile": {
+                "version": 1,
+                "modelKind": "RATED_RANGE",
+                "selectionMode": "CATALOG_DEFAULT",
+                "consumptionKwhPer100km": null,
+                "consumptionSource": "UNKNOWN",
+                "consumptionMeasurementBasis": "UNKNOWN",
+                "consumptionStandard": "NONE",
+                "sourceUrl": null,
+                "usableBatteryCapacityKwh": null,
+                "capacityBasis": "MANUFACTURER_DECLARED_UNSPECIFIED",
+                "ratedRangeKm": 480,
+                "ratedRangeStandard": "NEDC"
+              }
+            }
+          },
+          {
+            "key": "review-custom",
+            "source": "custom",
+            "active": false,
+            "vehicle": {
+              "nickname": "Group EV - example",
+              "make": "BYD",
+              "model": "ATTO 3",
+              "year": 2026,
+              "batteryCapacityKwh": 60.48,
+              "rangeKm": 480,
+              "consumptionKwhPer100km": null,
+              "connectorTypes": [
+                "TYPE2",
+                "CCS2"
+              ],
+              "settings": {
+                "maxAcKw": 7,
+                "maxDcKw": 88,
+                "startingBatteryPct": 80,
+                "imageUrl": "/images/vehicles/byd-atto-3.png"
+              },
+              "catalog": null,
+              "energyProfile": {
+                "version": 1,
+                "modelKind": "RATED_RANGE",
+                "selectionMode": "CATALOG_DEFAULT",
+                "consumptionKwhPer100km": null,
+                "consumptionSource": "UNKNOWN",
+                "consumptionMeasurementBasis": "UNKNOWN",
+                "consumptionStandard": "NONE",
+                "sourceUrl": null,
+                "usableBatteryCapacityKwh": null,
+                "capacityBasis": "MANUFACTURER_DECLARED_UNSPECIFIED",
+                "ratedRangeKm": 480,
+                "ratedRangeStandard": "NEDC"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "source": {
+      "blocks": [
+        {
+          "id": "starting-part-review",
+          "kind": "list",
+          "title": "A plan everyone can make their own",
+          "date": "2027-03-20",
+          "colorId": "teal",
+          "items": [
+            {
+              "id": "review-item-0-0",
+              "type": "note",
+              "content": "A shared outline for travelling together. The list below holds optional ideas, while the itinerary gives the group a simple daily structure.\n\n## Before you go\n- Agree on the must-sees before booking.\n- Leave room for a break and a change of plans.\n- Confirm current access and charging information independently.\n\n### Make it yours\nChange the dates, reorder a stop or return to your saved ideas. [Read Navio help](/help)."
+            }
+          ]
+        },
+        {
+          "id": "review-list-0",
+          "kind": "list",
+          "title": "Group ideas",
+          "date": "2027-03-20",
+          "colorId": "indigo",
+          "items": [
+            {
+              "id": "review-item-1-0",
+              "type": "note",
+              "content": "## Group ideas\nKeep these as possibilities rather than extra obligations."
+            },
+            {
+              "id": "review-item-1-1",
+              "type": "checklist",
+              "title": "Before leaving",
+              "items": [
+                {
+                  "id": "shared-day-1-item-2-check-0",
+                  "label": "Agree on the must-sees before booking.",
+                  "checked": false
+                },
+                {
+                  "id": "shared-day-1-item-2-check-1",
+                  "label": "Leave room for a break and a change of plans.",
+                  "checked": false
+                },
+                {
+                  "id": "shared-day-1-item-2-check-2",
+                  "label": "Confirm current access and charging information independently.",
+                  "checked": false
+                }
+              ]
+            },
+            {
+              "id": "review-item-1-2",
+              "type": "place",
+              "placeId": "preview:nishiki",
+              "name": "Nishiki Market",
+              "address": "",
+              "lat": 35.005,
+              "lng": 135.7649,
+              "notes": "An optional idea from the example list, not a scheduled visit."
+            }
+          ]
+        },
+        {
+          "id": "review-day-0",
+          "kind": "itinerary",
+          "title": "Quiet paths & the old city",
+          "date": "2027-03-20",
+          "colorId": "teal",
+          "items": [
+            {
+              "id": "review-item-2-0",
+              "type": "place",
+              "placeId": "preview:fushimi",
+              "name": "Fushimi Inari Taisha",
+              "description": "A walk through wooded paths and rows of vermilion torii.",
+              "address": "",
+              "lat": 34.9671,
+              "lng": 135.7727,
+              "schedule": [
+                {
+                  "id": "arrival",
+                  "time": "09:00",
+                  "timeEnd": "09:10",
+                  "label": "Arrive and get oriented"
+                },
+                {
+                  "id": "visit",
+                  "time": "09:10",
+                  "timeEnd": "10:00",
+                  "label": "Time to explore"
+                }
+              ],
+              "imageUrl": "/images/plan-covers/kyoto.webp",
+              "notes": "Go early if you enjoy a quieter walk. We left plenty of room in the morning rather than trying to see everything in one day.",
+              "time": "08:30",
+              "timeEnd": "10:00"
+            },
+            {
+              "id": "review-item-2-1",
+              "type": "place",
+              "placeId": "preview:kiyomizu",
+              "name": "Kiyomizu-dera",
+              "address": "",
+              "lat": 34.9949,
+              "lng": 135.785,
+              "notes": "Take your time on the walk up. The little streets are part of the visit.",
+              "time": "11:30",
+              "arrivalMode": "walk"
+            },
+            {
+              "id": "review-item-2-2",
+              "type": "note",
+              "content": "Leave the afternoon flexible. It is a trip, not a checklist."
+            },
+            {
+              "id": "review-item-2-3",
+              "type": "place",
+              "placeId": "preview:gion",
+              "name": "Gion",
+              "address": "",
+              "lat": 35.003,
+              "lng": 135.778,
+              "notes": "An evening walk, then dinner somewhere nearby. Respect the private lanes and local signs.",
+              "time": "17:00",
+              "arrivalMode": "walk"
+            }
+          ]
+        },
+        {
+          "id": "review-day-1",
+          "kind": "itinerary",
+          "title": "A slower day by the hills",
+          "date": "2027-03-21",
+          "colorId": "amber",
+          "items": [
+            {
+              "id": "review-item-3-0",
+              "type": "place",
+              "placeId": "preview:arashiyama",
+              "name": "Arashiyama",
+              "description": "Make space for a longer walk and an unhurried lunch.",
+              "address": "",
+              "lat": 35.0094,
+              "lng": 135.6668,
+              "schedule": [
+                {
+                  "id": "arrival",
+                  "time": "09:00",
+                  "timeEnd": "09:10",
+                  "label": "Arrive and get oriented"
+                },
+                {
+                  "id": "visit",
+                  "time": "09:10",
+                  "timeEnd": "10:00",
+                  "label": "Time to explore"
+                }
+              ],
+              "notes": "Keep this stop flexible and check current visitor information.",
+              "time": "09:00"
+            },
+            {
+              "id": "review-item-3-1",
+              "type": "place",
+              "placeId": "ev-charger:preview:charger",
+              "name": "Charging stop (preview)",
+              "address": "",
+              "lat": 35.011,
+              "lng": 135.681,
+              "notes": "This demonstrates how the shared charging-stop card will look; it is not a verified charging location.",
+              "evCharger": {
+                "connectorTypes": [],
+                "maxKw": 50,
+                "totalConnectors": 0,
+                "availableConnectors": null,
+                "priceText": "Check the operator’s current pricing",
+                "openingHoursSummary": "Example only · verify before traveling",
+                "estimatedChargeMinutes": null,
+                "operatorName": null
+              }
+            },
+            {
+              "id": "review-item-3-2",
+              "type": "checklist",
+              "title": "Before setting out",
+              "items": [
+                {
+                  "id": "shared-day-2-item-3-check-0",
+                  "label": "Water for the walk",
+                  "checked": false
+                },
+                {
+                  "id": "shared-day-2-item-3-check-1",
+                  "label": "Check charging access",
+                  "checked": false
+                },
+                {
+                  "id": "shared-day-2-item-3-check-2",
+                  "label": "Leave time for a break",
+                  "checked": false
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "review-day-2",
+          "kind": "itinerary",
+          "title": "Return to a favorite",
+          "date": "2027-03-22",
+          "colorId": "rose",
+          "items": [
+            {
+              "id": "review-item-4-0",
+              "type": "place",
+              "placeId": "preview:fushimi",
+              "name": "Fushimi Inari Taisha",
+              "address": "",
+              "lat": 34.9671,
+              "lng": 135.7727,
+              "schedule": [
+                {
+                  "id": "arrival",
+                  "time": "09:00",
+                  "timeEnd": "09:10",
+                  "label": "Arrive and get oriented"
+                },
+                {
+                  "id": "visit",
+                  "time": "09:10",
+                  "timeEnd": "10:00",
+                  "label": "Time to explore"
+                }
+              ],
+              "imageUrl": "/images/plan-covers/kyoto.webp",
+              "notes": "We kept this return visit optional. Revisiting a favorite can be better than adding another stop."
+            },
+            {
+              "id": "review-item-4-1",
+              "type": "note",
+              "content": "A café to decide later (location not shared)\n\nAn example of a stop whose location has not been shared."
+            }
+          ]
+        }
+      ],
+      "budget": {
+        "currency": "JPY",
+        "amount": 32000,
+        "expenses": [
+          {
+            "id": "shared-expense-1",
+            "amount": 12000,
+            "label": "Food",
+            "categoryId": "other"
+          },
+          {
+            "id": "shared-expense-2",
+            "amount": 8000,
+            "label": "Transport",
+            "categoryId": "other"
+          },
+          {
+            "id": "place-expense-review-item-2-0/2",
+            "amount": 12000,
+            "label": "Activities",
+            "categoryId": "activities"
+          }
+        ]
+      },
+      "energyState": {
+        "initialSocPct": 80,
+        "vehicleSnapshot": {
+          "version": 1,
+          "vehicleId": "3a2fa9f4-0829-4fd9-a573-8773e28c9a6c",
+          "label": "BYD ATTO 3",
+          "profile": {
+            "version": 1,
+            "modelKind": "RATED_RANGE",
+            "selectionMode": "CATALOG_DEFAULT",
+            "consumptionKwhPer100km": null,
+            "consumptionSource": "UNKNOWN",
+            "consumptionMeasurementBasis": "UNKNOWN",
+            "consumptionStandard": "NONE",
+            "sourceUrl": null,
+            "usableBatteryCapacityKwh": null,
+            "capacityBasis": "MANUFACTURER_DECLARED_UNSPECIFIED",
+            "ratedRangeKm": 480,
+            "ratedRangeStandard": "NEDC"
+          },
+          "maxAcKw": 7,
+          "maxDcKw": 88,
+          "connectorTypes": [
+            "TYPE2",
+            "CCS2"
+          ],
+          "legacyConsumptionConfirmed": false
+        },
+        "garageVehicleIds": [
+          "3a2fa9f4-0829-4fd9-a573-8773e28c9a6c",
+          "12de9f2f-7530-4e51-8d50-b44464bf912d"
+        ],
+        "vehicles": [
+          {
+            "scope": "trip",
+            "vehicle": {
+              "nickname": null,
+              "make": "BYD",
+              "model": "ATTO 3",
+              "year": 2026,
+              "batteryCapacityKwh": 60.48,
+              "rangeKm": 480,
+              "consumptionKwhPer100km": null,
+              "connectorTypes": [
+                "TYPE2",
+                "CCS2"
+              ],
+              "settings": {
+                "maxAcKw": 7,
+                "maxDcKw": 88,
+                "startingBatteryPct": 80,
+                "imageUrl": "/images/vehicles/byd-atto-3.png"
+              },
+              "catalog": {
+                "id": "th-byd-atto-3-extended-2026",
+                "make": "BYD",
+                "model": "ATTO 3",
+                "trim": "Extended",
+                "year": 2026,
+                "market": "TH",
+                "batteryCapacityKwh": 60.48,
+                "batteryCapacityBasis": "MANUFACTURER_DECLARED",
+                "rangeKm": 480,
+                "rangeStandard": "NEDC",
+                "connectorTypes": [
+                  "TYPE2",
+                  "CCS2"
+                ],
+                "maxAcKw": 7,
+                "maxDcKw": 88,
+                "imageUrl": "/images/vehicles/byd-atto-3.png",
+                "sourceUrl": "https://www.reverautomotive.com/media/models/new-atto3/brochure/bydatto3_MY2026.pdf",
+                "verifiedAt": "2026-09-12"
+              },
+              "energyProfile": {
+                "version": 1,
+                "modelKind": "RATED_RANGE",
+                "selectionMode": "CATALOG_DEFAULT",
+                "consumptionKwhPer100km": null,
+                "consumptionSource": "UNKNOWN",
+                "consumptionMeasurementBasis": "UNKNOWN",
+                "consumptionStandard": "NONE",
+                "sourceUrl": null,
+                "usableBatteryCapacityKwh": null,
+                "capacityBasis": "MANUFACTURER_DECLARED_UNSPECIFIED",
+                "ratedRangeKm": 480,
+                "ratedRangeStandard": "NEDC"
+              },
+              "id": "3a2fa9f4-0829-4fd9-a573-8773e28c9a6c",
+              "isDefault": false,
+              "createdAt": "2026-10-29T08:25:05.269Z",
+              "updatedAt": "2026-10-29T08:25:05.269Z"
+            }
+          },
+          {
+            "scope": "trip",
+            "vehicle": {
+              "nickname": "Group EV - example",
+              "make": "BYD",
+              "model": "ATTO 3",
+              "year": 2026,
+              "batteryCapacityKwh": 60.48,
+              "rangeKm": 480,
+              "consumptionKwhPer100km": null,
+              "connectorTypes": [
+                "TYPE2",
+                "CCS2"
+              ],
+              "settings": {
+                "maxAcKw": 7,
+                "maxDcKw": 88,
+                "startingBatteryPct": 80,
+                "imageUrl": "/images/vehicles/byd-atto-3.png"
+              },
+              "catalog": null,
+              "energyProfile": {
+                "version": 1,
+                "modelKind": "RATED_RANGE",
+                "selectionMode": "CATALOG_DEFAULT",
+                "consumptionKwhPer100km": null,
+                "consumptionSource": "UNKNOWN",
+                "consumptionMeasurementBasis": "UNKNOWN",
+                "consumptionStandard": "NONE",
+                "sourceUrl": null,
+                "usableBatteryCapacityKwh": null,
+                "capacityBasis": "MANUFACTURER_DECLARED_UNSPECIFIED",
+                "ratedRangeKm": 480,
+                "ratedRangeStandard": "NEDC"
+              },
+              "id": "12de9f2f-7530-4e51-8d50-b44464bf912d",
+              "isDefault": false,
+              "createdAt": "2026-10-29T08:25:05.269Z",
+              "updatedAt": "2026-10-29T08:25:05.269Z"
+            }
+          }
+        ]
+      },
+      "options": {
+        "includeDates": true,
+        "includeNotes": true,
+        "includeBudget": true,
+        "includeStartingPart": true,
+        "includeGarage": true,
+        "listIds": [
+          "review-list-0"
+        ],
+        "excludedVehicleIds": [],
+        "confirmedCustomVehicleIds": [
+          "12de9f2f-7530-4e51-8d50-b44464bf912d"
+        ]
+      }
+    }
+  }
+]

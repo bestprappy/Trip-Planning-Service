@@ -94,8 +94,9 @@ public class SharedPlanController {
     @PostMapping("/{token}/copies")
     public ResponseEntity<TripResponse> copySharedPlan(
             @RequestHeader(name = "X-User-Id") UUID userId,
-            @PathVariable String token) {
+            @PathVariable String token,
+            @org.springframework.web.bind.annotation.RequestBody(required=false) com.navio.tripplanningservice.dto.publication.CopyPlanRequest request) {
         return ResponseEntity.status(201).cacheControl(CacheControl.noStore())
-                .body(publicationService.copySharedPlan(token, userId));
+                .body(request==null?publicationService.copySharedPlan(token, userId):publicationService.copySharedPlan(token,userId,request));
     }
 }

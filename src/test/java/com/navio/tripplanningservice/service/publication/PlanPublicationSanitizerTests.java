@@ -51,6 +51,20 @@ class PlanPublicationSanitizerTests {
     private final PlanPublicationSanitizer sanitizer = new PlanPublicationSanitizer();
     private final ObjectMapper mapper = new ObjectMapper().registerModule(new JavaTimeModule());
 
+    @Test
+    void selectedStartingDocumentAndListsSurvivePublicationWithoutUnselectedLists() throws Exception {
+        var options = mapper.copy().disable(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+            .readValue("{\"includeStartingPart\":true,\"includeNotes\":true,\"listIds\":[\"ideas\"]}", PublicationOptions.class);
+        var intro = new PlannerBlockDto("starting-part-main", "list", "Before you go", null, "teal", List.of(note("intro", "## Welcome\nBring water")));
+        var list = new PlannerBlockDto("ideas", "list", "Extra time", null, "rose", List.of(note("idea", "A flexible afternoon")));
+        var hidden = new PlannerBlockDto("private-list", "list", "Private packing", null, "teal", List.of(note("secret", "Never share this")));
+        var tree = mapper.readTree(toJson(sanitizeSnapshot(options, intro, list, hidden, itineraryDay("day", LocalDate.of(2026,3,1)).build())));
+        assertThat(tree.path("startingPart").path("content").asText()).contains("Bring water");
+        assertThat(tree.path("lists").size()).isEqualTo(1);
+        assertThat(tree.path("lists").get(0).path("title").asText()).isEqualTo("Extra time");
+        assertThat(tree.toString()).doesNotContain("Never share this", "private-list");
+    }
+
     // ---------------------------------------------------------------- anchors
 
     @Test

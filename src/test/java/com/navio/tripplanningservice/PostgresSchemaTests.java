@@ -67,7 +67,7 @@ class PostgresSchemaTests {
                     .schemas("trip").defaultSchema("trip").load();
                 // V14 energy state, V15 garage membership, V16 stop arrival mode,
                 // V17 precise charging plan, V18 transit route choice, V19 time source and V20 stop schedule.
-                assertThat(upgraded.migrate().migrationsExecuted).isEqualTo(8);
+                assertThat(upgraded.migrate().migrationsExecuted).isEqualTo(9);
                 upgraded.validate();
                 try (var connection = java.sql.DriverManager.getConnection(upgradeUrl, username, password);
                      var sql = connection.createStatement(); var row = sql.executeQuery("SELECT count(*) FROM trip.shared_plan_copy WHERE publication_id='33333333-3333-4333-8333-333333333333'")) {

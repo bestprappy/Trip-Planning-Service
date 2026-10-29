@@ -89,6 +89,7 @@ public class PlanPublicationSanitizer {
         List<PlannerBlockDto> blocks = nullSafe(snapshot == null ? null : snapshot.blocks());
 
         List<PublicDayDto> days = new ArrayList<>();
+        java.util.Map<String,String> publicRefs = new java.util.HashMap<>();
         int dayNumber = 0;
         for (PlannerBlockDto block : blocks) {
             if (block == null || !isItineraryDay(block)) {
@@ -97,9 +98,27 @@ public class PlanPublicationSanitizer {
                 continue;
             }
             dayNumber++;
-            days.add(sanitizeDay(block, dayNumber, options));
+            var publishedDay=sanitizeDay(block, dayNumber, options);
+            days.add(publishedDay);
+            collectRefs(block,publishedDay,options,publicRefs);
         }
 
+        var selectedLists = new ArrayList<PublicDayDto>();
+        com.navio.tripplanningservice.dto.publication.PublicStartingPartDto starting = null;
+        for (var block : blocks) {
+            if (block == null || !"list".equalsIgnoreCase(block.kind())) continue;
+            if (block.id() != null && block.id().startsWith("starting-part-")) {
+                if (options.includeStartingPart()) {
+                    String content = nullSafe(block.items()).stream().filter(i -> i != null && "note".equals(i.type()))
+                        .map(i -> safeText(i.content())).filter(java.util.Objects::nonNull).collect(java.util.stream.Collectors.joining("\n\n"));
+                    if (!content.isBlank()) starting = new com.navio.tripplanningservice.dto.publication.PublicStartingPartDto(safeText(block.title()),content);
+                }
+            } else if (options.listIds().contains(block.id())) {
+                var section = sanitizeDay(block,-selectedLists.size()-1,options);
+                collectRefs(block,section,options,publicRefs);
+                selectedLists.add(new PublicDayDto("My List",null,safeText(block.title()),section.colorId(),null,null,section.items()));
+            }
+        }
         return new PublicPlanSnapshot(
                 SANITIZER_VERSION,
                 resolveTitle(trip),
@@ -110,9 +129,9 @@ public class PlanPublicationSanitizer {
                 days.size(),
                 List.copyOf(days),
                 options.includeBudget()
-                        ? sanitizeBudget(snapshot == null ? null : snapshot.budget())
+                        ? sanitizeBudget(snapshot == null ? null : snapshot.budget(),publicRefs)
                         : null,
-                options);
+                options.publicSummary(), starting, selectedLists.isEmpty()?null:List.copyOf(selectedLists), PublishedGarage.publish(snapshot == null ? null : snapshot.energyState(),options));
     }
 
     /** A publish-time name replaces only the public copy, never the private trip. */
@@ -121,7 +140,7 @@ public class PlanPublicationSanitizer {
         if (title == null || title.isBlank()) return snapshot;
         return new PublicPlanSnapshot(snapshot.sanitizerVersion(), title,
                 snapshot.destinationCity(), snapshot.destinationCountry(), snapshot.startDate(),
-                snapshot.endDate(), snapshot.dayCount(), snapshot.days(), snapshot.budget(), snapshot.included());
+                snapshot.endDate(), snapshot.dayCount(), snapshot.days(), snapshot.budget(), snapshot.included(), snapshot.startingPart(), snapshot.lists(), snapshot.garage());
     }
 
     /**
@@ -154,7 +173,11 @@ public class PlanPublicationSanitizer {
                 previousPublic = null;
             }
             if (sanitized != null) {
-                items.add(sanitized);
+                var moments = item.schedule() == null ? null : java.util.stream.IntStream.range(0,item.schedule().size()).mapToObj(index -> {
+                    var moment=item.schedule().get(index);
+                    return new com.navio.tripplanningservice.dto.PlannerScheduleEntryDto("moment-"+index,moment.time(),moment.timeEnd(),Objects.requireNonNullElse(safeText(moment.label()),""));
+                }).toList();
+                items.add(sanitized.withDetails("public-"+dayNumber+"-"+items.size(),moments,Set.of("fixed","calculated").contains(Objects.requireNonNullElse(item.timeSource(),""))?item.timeSource():null));
             }
         }
 
@@ -299,7 +322,7 @@ public class PlanPublicationSanitizer {
                 safeText(charger.operatorName()));
     }
 
-    private PublicBudgetDto sanitizeBudget(com.navio.tripplanningservice.dto.PlannerBudgetDto budget) {
+    private PublicBudgetDto sanitizeBudget(com.navio.tripplanningservice.dto.PlannerBudgetDto budget,java.util.Map<String,String> refs) {
         if (budget == null) {
             return null;
         }
@@ -314,12 +337,23 @@ public class PlanPublicationSanitizer {
                     // expense.date() is not carried: an expense date is a travel
                     // date, and the dates option has to hold everywhere one is
                     // encoded, not just on the fields called "date".
-                    safeText(expense.categoryId())));
+                    safeText(expense.categoryId()), expenseRef(expense.id(),refs)));
         }
         return new PublicBudgetDto(
                 Objects.requireNonNullElse(budget.currency(), CurrencyCode.THB),
                 Objects.requireNonNullElse(budget.amount(), BigDecimal.ZERO),
                 List.copyOf(expenses));
+    }
+
+    private void collectRefs(PlannerBlockDto source,PublicDayDto published,PublicationOptions options,java.util.Map<String,String> refs){
+        int index=0;
+        for(var item:nullSafe(source.items()))if(sanitizeItem(item,options)!=null){if(index<published.items().size())refs.put(item.id(),published.items().get(index++).id());}
+    }
+    private String expenseRef(String id,java.util.Map<String,String> refs){
+        if(id==null)return null;
+        if(id.startsWith("place-cost-"))return refs.get(id.substring(11));
+        if(id.startsWith("place-expense-")){var encoded=id.substring(14).split("/",2)[0];try{return refs.get(java.net.URLDecoder.decode(encoded,java.nio.charset.StandardCharsets.UTF_8));}catch(IllegalArgumentException ignored){return null;}}
+        return null;
     }
 
     private boolean isItineraryDay(PlannerBlockDto block) {

@@ -76,6 +76,11 @@ public class TripPublication {
     @Column(nullable = false)
     private Boolean includeBudget = false;
 
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "jsonb")
+    private java.util.Map<String,Object> selectionOptions;
+
+
     /** Also shown on the public Explore page. A separate opt-in from the link itself. */
     @Builder.Default
     @Column(nullable = false)

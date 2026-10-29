@@ -680,6 +680,45 @@ class TripPublicationServiceTests {
     }
 
     @Test
+    void copyRetainsSelectedStartingPartListsAndDayIdentity() throws Exception {
+        var publication=activePublication(1);publication.setListedInExplore(true);
+        publication.setSnapshot("""
+         {"sanitizerVersion":1,"title":"Shared","dayCount":1,
+          "startingPart":{"title":"Before you go","content":"## Welcome\\nBring water"},
+          "lists":[{"label":"My List","title":"Ideas","colorId":"amber","items":[{"type":"note","noteContent":"Leave time"}]}],
+          "days":[{"label":"Day 1","title":"Old town","colorId":"rose","items":[]}]}
+         """);
+        when(publicationRepository.findByTokenAndStatus("tok-existing",TripPublication.PublicationStatus.ACTIVE)).thenReturn(Optional.of(publication));
+        when(tripRepository.saveAndFlush(any())).thenAnswer(call->{Trip trip=call.getArgument(0);trip.setId(UUID.randomUUID());trip.setVersion(0L);return trip;});
+        service.copySharedPlan("tok-existing",STRANGER);
+        var capture=ArgumentCaptor.forClass(PlannerSnapshotRequest.class);
+        verify(plannerService).savePlannerSnapshot(any(),org.mockito.ArgumentMatchers.eq(STRANGER),capture.capture());
+        var blocks=capture.getValue().blocks();
+        assertThat(blocks).hasSize(3);
+        assertThat(blocks.get(0).id()).startsWith("starting-part-");
+        assertThat(blocks.get(0).items().getFirst().content()).contains("Bring water");
+        assertThat(blocks.get(1).title()).isEqualTo("Ideas");
+        assertThat(blocks.get(2).title()).isEqualTo("Old town");assertThat(blocks.get(2).colorId()).isEqualTo("rose");
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings={"retain","change"})
+    void copyPreservesPublishedTripDurationWithSparseItinerary(String mode) {
+        var publication=activePublication(1);publication.setListedInExplore(true);
+        publication.setSnapshot("""
+         {"sanitizerVersion":1,"title":"Seven days","dayCount":2,"startDate":"2027-03-10","endDate":"2027-03-16",
+          "days":[{"label":"Day 1","date":"2027-03-10","items":[]},{"label":"Day 2","date":"2027-03-11","items":[]}]}
+         """);
+        when(publicationRepository.findByTokenAndStatus("tok-existing",TripPublication.PublicationStatus.ACTIVE)).thenReturn(Optional.of(publication));
+        when(tripRepository.saveAndFlush(any())).thenAnswer(call->{Trip trip=call.getArgument(0);trip.setId(UUID.randomUUID());trip.setVersion(0L);return trip;});
+        service.copySharedPlan("tok-existing",STRANGER,new com.navio.tripplanningservice.dto.publication.CopyPlanRequest(mode,java.time.LocalDate.of(2030,1,1)));
+        var capture=ArgumentCaptor.forClass(Trip.class);verify(tripRepository).saveAndFlush(capture.capture());
+        var copied=capture.getValue();
+        assertThat(java.time.temporal.ChronoUnit.DAYS.between(copied.getStartDate(),copied.getEndDate())).isEqualTo(6);
+        assertThat(copied.getStartDate()).isEqualTo("retain".equals(mode)?java.time.LocalDate.of(2027,3,10):java.time.LocalDate.of(2030,1,1));
+    }
+
+    @Test
     void listingWithANameRefreshesTheByline() {
         givenOwnedTripAtVersion(3L);
         TripPublication published = activePublication(2);
