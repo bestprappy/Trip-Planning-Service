@@ -34,18 +34,41 @@ public class SharedPlanSummaryService {
     private final ObjectMapper objectMapper;
 
     public ExplorePlanSummary summarizeListedPlan(String token) {
+        return summarize(token,true);
+    }
+
+    /** Known shared links may be bookmarked without making unlisted links enumerable. */
+    public ExplorePlanSummary summarizeSharedReference(String token) {
+        return summarize(token,false);
+    }
+
+    public record BookmarkReference(String token,String title,String authorName,String destinationCity,String destinationCountry,int dayCount,String startDate) {}
+    public BookmarkReference bookmarkReference(String token) {
+        var row=load(token,false);
+        var snapshot=snapshot(row);
+        var p=summarizer.summarize(row.getToken(),snapshot,row.getAuthorDisplayName(),row.getListedAt(),row.getUpdatedAt());
+        return new BookmarkReference(p.token(),p.title(),p.authorName(),p.destinationCity(),p.destinationCountry(),p.dayCount(),
+            snapshot.startDate()==null?null:snapshot.startDate().toString());
+    }
+
+    private ExplorePlanSummary summarize(String token,boolean listedOnly) {
+        var publication=load(token,listedOnly);
+        return summarizer.summarize(publication.getToken(),snapshot(publication),publication.getAuthorDisplayName(),publication.getListedAt(),publication.getUpdatedAt());
+    }
+    private TripPublication load(String token,boolean listedOnly) {
         if (token == null || token.isBlank()) {
             throw new SharedPlanUnavailableException();
         }
-        TripPublication publication = publicationRepository
+        return publicationRepository
                 .findByTokenAndStatus(token, TripPublication.PublicationStatus.ACTIVE)
-                .filter(TripPublication::isListed)
+                .filter(row -> !listedOnly || row.isListed())
                 // Same rule as the shared page: a snapshot frozen under older
                 // redaction rules is not served until it is re-published.
                 .filter(row -> row.getSanitizerVersion() != null
                         && row.getSanitizerVersion() >= PlanPublicationSanitizer.SANITIZER_VERSION)
                 .orElseThrow(SharedPlanUnavailableException::new);
-
+    }
+    private PublicPlanSnapshot snapshot(TripPublication publication) {
         PublicPlanSnapshot snapshot;
         try {
             snapshot = objectMapper.readValue(publication.getSnapshot(), PublicPlanSnapshot.class);
@@ -53,11 +76,6 @@ public class SharedPlanSummaryService {
             log.error("Stored snapshot for publication {} is unreadable", publication.getId(), exception);
             throw new SharedPlanUnavailableException();
         }
-        return summarizer.summarize(
-                publication.getToken(),
-                snapshot,
-                publication.getAuthorDisplayName(),
-                publication.getListedAt(),
-                publication.getUpdatedAt());
+        return snapshot;
     }
 }

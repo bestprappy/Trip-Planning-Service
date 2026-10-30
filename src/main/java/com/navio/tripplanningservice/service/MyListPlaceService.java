@@ -46,7 +46,16 @@ public class MyListPlaceService {
         if (!Objects.equals(request.expectedVersion(), trip.getVersion())) {
             throw new ObjectOptimisticLockingFailureException(Trip.class, tripId);
         }
-        var detail = places.getDetail(request.providerPlaceId());
+        com.navio.tripplanningservice.integration.mobility.MobilityPlaceDetail detail;
+        String address="";
+        if("SAVED_LOCATION".equals(request.provider())) {
+            var saved=request.savedLocation();
+            if(saved==null||saved.name()==null||saved.name().isBlank()||!validCoordinate(saved.lat(),90)||!validCoordinate(saved.lng(),180))
+                throw invalid("Choose a saved place with a valid name and map location");
+            detail=new com.navio.tripplanningservice.integration.mobility.MobilityPlaceDetail(saved.name(),
+                new com.navio.tripplanningservice.integration.mobility.MobilityPlaceDetail.Coordinates(saved.lat(),saved.lng()),null);
+            address=saved.address()==null?"":saved.address();
+        } else detail = places.getDetail(request.providerPlaceId());
         if (detail == null || detail.name() == null || detail.name().isBlank() || detail.location() == null
                 || !validCoordinate(detail.location().lat(), 90) || !validCoordinate(detail.location().lng(), 180)) {
             throw invalid("The place has no valid name or map location");
@@ -60,7 +69,7 @@ public class MyListPlaceService {
         String clientId = UUID.randomUUID().toString();
         items.save(BlockItem.builder().blockId(selected.getId()).clientId(clientId)
                 .type(BlockItem.BlockItemType.PLACE).placeId(request.providerPlaceId())
-                .title(clamp(detail.name(), TITLE)).placeName(clamp(detail.name(), NAME)).placeAddress("")
+                .title(clamp(detail.name(), TITLE)).placeName(clamp(detail.name(), NAME)).placeAddress(clamp(address,ADDRESS))
                 .placeLat(detail.location().lat()).placeLng(detail.location().lng()).visited(false)
                 .displayOrder(existing.stream().map(BlockItem::getDisplayOrder).filter(Objects::nonNull)
                         .max(Integer::compareTo).orElse(-1) + 1).build());

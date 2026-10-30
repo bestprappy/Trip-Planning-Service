@@ -111,6 +111,16 @@ class SharedPlanSummaryServiceTests {
                 .thenReturn(Optional.of(publication));
     }
 
+    @Test void bookmarkReferenceAcceptsKnownUnlistedLinkWithoutCountingAView() {
+        stubPublication(publication(false,PlanPublicationSanitizer.SANITIZER_VERSION,snapshotJson()));
+        assertThat(service.summarizeSharedReference(TOKEN).title()).isEqualTo("Songkran road trip");
+        verify(publicationRepository,never()).incrementViewCount(any());
+    }
+    @Test void bookmarkReferenceRefusesObsoleteRedaction() {
+        stubPublication(publication(false,PlanPublicationSanitizer.SANITIZER_VERSION-1,snapshotJson()));
+        assertThatThrownBy(()->service.summarizeSharedReference(TOKEN)).isInstanceOf(SharedPlanUnavailableException.class);
+    }
+
     private TripPublication publication(boolean listed, int sanitizerVersion, String snapshot) {
         return TripPublication.builder()
                 .token(TOKEN)

@@ -111,4 +111,15 @@ class MyListPlaceServiceTests {
         verify(blocks, never()).save(any());
         verifyNoInteractions(items);
     }
+    @Test void savedCoordinateLocationIsReusableWithoutGoogleResolution() {
+        owned(List.of(list("list-1")));
+        when(trips.saveAndFlush(trip)).thenReturn(trip);
+        var request=new AppendMyListPlaceRequest("MAPBOX:place-one","SAVED_LOCATION","list-1",4L,
+            new AppendMyListPlaceRequest.SavedLocation("Saved cafe","Saved address",13.0,100.0));
+        service.append(tripId,userId,request);
+        var captured=ArgumentCaptor.forClass(BlockItem.class);verify(items).save(captured.capture());
+        assertThat(captured.getValue().getPlaceLat()).isEqualTo(13.0);
+        assertThat(captured.getValue().getPlaceAddress()).isEqualTo("Saved address");
+        verifyNoInteractions(places);
+    }
 }

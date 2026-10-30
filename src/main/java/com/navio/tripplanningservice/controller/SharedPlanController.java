@@ -90,6 +90,13 @@ public class SharedPlanController {
                 .body(summaryService.summarizeListedPlan(token));
     }
 
+    @GetMapping("/{token}/reference")
+    public ResponseEntity<com.navio.tripplanningservice.service.publication.SharedPlanSummaryService.BookmarkReference> bookmarkReference(@PathVariable String token) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+            .header("X-Robots-Tag","noindex, nofollow, noarchive")
+            .body(summaryService.bookmarkReference(token));
+    }
+
     /** Authenticated copy of a listed, still published plan into the caller's account. */
     @PostMapping("/{token}/copies")
     public ResponseEntity<TripResponse> copySharedPlan(
