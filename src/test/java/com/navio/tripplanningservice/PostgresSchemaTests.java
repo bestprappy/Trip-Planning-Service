@@ -66,8 +66,9 @@ class PostgresSchemaTests {
                 var upgraded = Flyway.configure().dataSource(upgradeUrl, username, password)
                     .schemas("trip").defaultSchema("trip").load();
                 // V14 energy state, V15 garage membership, V16 stop arrival mode,
-                // V17 precise charging plan, V18 transit route choice, V19 time source and V20 stop schedule.
-                assertThat(upgraded.migrate().migrationsExecuted).isEqualTo(9);
+                // V17 precise charging plan, V18 transit route choice, V19 time source, V20 stop schedule,
+                // V21 copy events, V22 shared sections and trip vehicles, and V23 day sections.
+                assertThat(upgraded.migrate().migrationsExecuted).isEqualTo(10);
                 upgraded.validate();
                 try (var connection = java.sql.DriverManager.getConnection(upgradeUrl, username, password);
                      var sql = connection.createStatement(); var row = sql.executeQuery("SELECT count(*) FROM trip.shared_plan_copy WHERE publication_id='33333333-3333-4333-8333-333333333333'")) {
@@ -157,5 +158,49 @@ class PostgresSchemaTests {
         assertThat(entityManager.find(com.navio.tripplanningservice.model.Trip.class, trip.getId()).getGarageVehicleIds()).isEmpty();
         assertThat(entityManager.find(com.navio.tripplanningservice.model.BlockItem.class, stop.getId()).getObservedSocPct()).isNull();
         assertThat(entityManager.find(com.navio.tripplanningservice.model.BlockItem.class, stop.getId()).getArrivalRouteKey()).isNull();
+    }
+
+    @Test
+    void aSectionDividerWithItsColourAndCitySurvivesRealPostgresReload() {
+        var block = com.navio.tripplanningservice.model.ListBlock.builder().tripId(persistedTrip().getId()).clientId("day")
+            .name("Day 1").type(com.navio.tripplanningservice.model.ListBlock.ListBlockType.ITINERARY).displayOrder(0)
+            .blockDate(java.time.LocalDate.of(2026, 10, 14)).build();
+        entityManager.persist(block);
+        var section = com.navio.tripplanningservice.model.BlockItem.builder().blockId(block.getId()).clientId("osaka")
+            .type(com.navio.tripplanningservice.model.BlockItem.BlockItemType.SECTION).displayOrder(0).title("Afternoon")
+            .sectionColor("coral").sectionDestinationId("osaka").sectionDestinationName("Osaka")
+            .sectionDestinationLat(34.69).sectionDestinationLng(135.5).sectionDestinationCountry("Japan").build();
+        entityManager.persist(section); entityManager.flush(); entityManager.clear();
+
+        var loaded = entityManager.find(com.navio.tripplanningservice.model.BlockItem.class, section.getId());
+
+        assertThat(loaded.getType()).isEqualTo(com.navio.tripplanningservice.model.BlockItem.BlockItemType.SECTION);
+        assertThat(loaded.getSectionColor()).isEqualTo("coral");
+        assertThat(loaded.getSectionDestinationName()).isEqualTo("Osaka");
+        assertThat(loaded.getSectionDestinationLat()).isEqualTo(34.69);
+        assertThat(loaded.getSectionDestinationCountry()).isEqualTo("Japan");
+    }
+
+    @Test
+    void theDatabaseRejectsASectionCityWithoutCoordinates() {
+        var block = com.navio.tripplanningservice.model.ListBlock.builder().tripId(persistedTrip().getId()).clientId("day")
+            .name("Day 1").type(com.navio.tripplanningservice.model.ListBlock.ListBlockType.ITINERARY).displayOrder(0)
+            .blockDate(java.time.LocalDate.of(2026, 10, 14)).build();
+        entityManager.persist(block);
+        var halfCity = com.navio.tripplanningservice.model.BlockItem.builder().blockId(block.getId()).clientId("half")
+            .type(com.navio.tripplanningservice.model.BlockItem.BlockItemType.SECTION).displayOrder(0).title("")
+            .sectionDestinationId("osaka").sectionDestinationName("Osaka").build();
+        entityManager.persist(halfCity);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(entityManager::flush)
+            .hasStackTraceContaining("ck_item_section_destination");
+    }
+
+    private com.navio.tripplanningservice.model.Trip persistedTrip() {
+        var trip = com.navio.tripplanningservice.model.Trip.builder()
+            .userId(java.util.UUID.randomUUID()).startDate(java.time.LocalDate.of(2026, 10, 14)).endDate(java.time.LocalDate.of(2026, 10, 15))
+            .destinationId("test").destinationName("Test").visibility(com.navio.tripplanningservice.model.TripVisibility.PRIVATE).build();
+        entityManager.persist(trip);
+        return trip;
     }
 }

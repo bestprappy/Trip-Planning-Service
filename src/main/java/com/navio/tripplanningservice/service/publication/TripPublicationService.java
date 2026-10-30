@@ -392,6 +392,11 @@ public class TripPublicationService {
                                     .map(sub -> new PlannerChecklistSubItemDto(
                                             "copied-check-" + UUID.randomUUID(), sub, false))
                                     .toList());
+            // The city name has no coordinates in a published plan, so only the title and colour copy.
+            case "section" -> new PlannerItemDto(id, "section", null, null, null, null, null, null,
+                            null, null, null, null, null, null, null, null, null,
+                            null, Objects.requireNonNullElse(item.name(), ""), null, null, null, null, null, null, null,
+                            item.colorId() != null && item.colorId().matches("[a-z]{1,32}") ? item.colorId() : null, null);
             default -> null;
         };
     }

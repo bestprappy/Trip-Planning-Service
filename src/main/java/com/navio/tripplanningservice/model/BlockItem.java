@@ -131,6 +131,19 @@ public class BlockItem {
     @Column(columnDefinition = "text")
     private String schedule;
 
+    // ============ SECTION FIELDS ============
+    /** Colour of the stops after a section divider; {@code null} keeps the day's colour. */
+    @Column(length = 32)
+    private String sectionColor;
+
+    /** The city this part of the day is in; all five columns are set together or not at all. */
+    @Column(length = 512)
+    private String sectionDestinationId;
+    private String sectionDestinationName;
+    private Double sectionDestinationLat;
+    private Double sectionDestinationLng;
+    private String sectionDestinationCountry;
+
     @Version
     @Column(nullable = false)
     private Long version;
@@ -179,6 +192,7 @@ public class BlockItem {
         CHECKLIST,      // Checklist container with ordered sub-items
         CHECKLIST_ITEM, // Task to complete
         NOTE,           // Free-form note
-        RESERVATION     // Hotel booking, restaurant reservation, etc.
+        RESERVATION,    // Hotel booking, restaurant reservation, etc.
+        SECTION         // Divider that starts a new part of a day (colour, city)
     }
 }

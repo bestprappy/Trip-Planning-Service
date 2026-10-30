@@ -624,6 +624,34 @@ class TripPublicationServiceTests {
         assertThat(copiedStop.lng()).isEqualTo(100.4888);
     }
 
+    @Test
+    void copyKeepsASectionsTitleAndColourButNotItsCityWhichHasNoCoordinates() {
+        TripPublication listed = activePublication(2);
+        listed.setListedInExplore(true);
+        listed.setSnapshot("""
+                {"sanitizerVersion":1,"title":"Shared title","dayCount":1,
+                 "days":[{"label":"Day 1","items":[{"type":"section","name":"Afternoon","colorId":"coral","city":"Osaka"}]}]}
+                """);
+        when(publicationRepository.findByTokenAndStatus("tok-existing", TripPublication.PublicationStatus.ACTIVE))
+                .thenReturn(Optional.of(listed));
+        when(tripRepository.saveAndFlush(any())).thenAnswer(call -> {
+            Trip copy = call.getArgument(0);
+            copy.setId(UUID.randomUUID());
+            copy.setVersion(0L);
+            return copy;
+        });
+
+        service.copySharedPlan("tok-existing", STRANGER);
+
+        ArgumentCaptor<PlannerSnapshotRequest> copiedPlan = ArgumentCaptor.forClass(PlannerSnapshotRequest.class);
+        verify(plannerService).savePlannerSnapshot(any(), org.mockito.ArgumentMatchers.eq(STRANGER), copiedPlan.capture());
+        PlannerItemDto copiedSection = copiedPlan.getValue().blocks().getFirst().items().getFirst();
+        assertThat(copiedSection.type()).isEqualTo("section");
+        assertThat(copiedSection.title()).isEqualTo("Afternoon");
+        assertThat(copiedSection.colorId()).isEqualTo("coral");
+        assertThat(copiedSection.destination()).isNull();
+    }
+
     // ------------------------------------------------------------------ byline
 
     @Test

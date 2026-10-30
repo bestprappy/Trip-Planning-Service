@@ -514,6 +514,125 @@ class PlannerServiceTest {
         org.assertj.core.api.Assertions.assertThat(snapshot.capabilities()).contains("item-schedule-v1");
     }
 
+    @Test
+    void roundTripsASectionDividerWithItsColourAndCityAndAdvertisesTheCapability() {
+        Trip trip = ownedTrip(1L);
+        when(tripRepository.findOwnedForUpdate(TRIP_ID, USER_ID)).thenReturn(Optional.of(trip));
+        when(tripRepository.findByIdAndUserId(TRIP_ID, USER_ID)).thenReturn(Optional.of(trip));
+        when(listBlockRepository.findByTripIdOrderByDisplayOrder(TRIP_ID)).thenReturn(List.of());
+        when(blockItemRepository.findByBlockIdOrderByDisplayOrder(BLOCK_ID)).thenReturn(List.of());
+        when(listBlockRepository.save(any(ListBlock.class))).thenAnswer(call -> {
+            ListBlock block = call.getArgument(0); block.setId(BLOCK_ID); return block;
+        });
+        when(blockItemRepository.save(any(BlockItem.class))).thenAnswer(call -> {
+            BlockItem item = call.getArgument(0); item.setId(ITEM_ID); return item;
+        });
+        when(tripRepository.saveAndFlush(trip)).thenReturn(trip);
+        PlannerDestinationDto osaka = new PlannerDestinationDto("osaka", "Osaka", 34.69, 135.5, "Japan");
+        var day = new PlannerBlockDto("day", "itinerary", "Day 1", LocalDate.of(2026, 10, 14), "blue",
+                List.of(section("osaka-afternoon", "Afternoon", "coral", osaka)), null);
+
+        plannerService.savePlannerSnapshot(TRIP_ID, USER_ID, new PlannerSnapshotRequest(1L, List.of(day)));
+
+        var block = ArgumentCaptor.forClass(ListBlock.class);
+        var item = ArgumentCaptor.forClass(BlockItem.class);
+        verify(listBlockRepository).save(block.capture());
+        verify(blockItemRepository).save(item.capture());
+        assertEquals(BlockItem.BlockItemType.SECTION, item.getValue().getType());
+        assertEquals("coral", item.getValue().getSectionColor());
+        assertEquals("Osaka", item.getValue().getSectionDestinationName());
+        when(listBlockRepository.findByTripIdOrderByDisplayOrder(TRIP_ID)).thenReturn(List.of(block.getValue()));
+        when(blockItemRepository.findByBlockIdOrderByDisplayOrder(BLOCK_ID)).thenReturn(List.of(item.getValue()));
+        var snapshot = plannerService.getPlannerSnapshot(TRIP_ID, USER_ID);
+        PlannerItemDto restored = snapshot.blocks().getFirst().items().getFirst();
+        assertEquals("section", restored.type());
+        assertEquals("Afternoon", restored.title());
+        assertEquals("coral", restored.colorId());
+        assertEquals(osaka, restored.destination());
+        org.assertj.core.api.Assertions.assertThat(snapshot.capabilities()).contains("day-sections-v1");
+    }
+
+    @Test
+    void aSectionThatKeepsTheDaysColourStoresNoColourOrCity() {
+        Trip trip = ownedTrip(1L);
+        when(tripRepository.findOwnedForUpdate(TRIP_ID, USER_ID)).thenReturn(Optional.of(trip));
+        when(listBlockRepository.findByTripIdOrderByDisplayOrder(TRIP_ID)).thenReturn(List.of());
+        when(blockItemRepository.findByBlockIdOrderByDisplayOrder(BLOCK_ID)).thenReturn(List.of());
+        when(listBlockRepository.save(any(ListBlock.class))).thenAnswer(call -> {
+            ListBlock block = call.getArgument(0); block.setId(BLOCK_ID); return block;
+        });
+        when(blockItemRepository.save(any(BlockItem.class))).thenAnswer(call -> {
+            BlockItem item = call.getArgument(0); item.setId(ITEM_ID); return item;
+        });
+        when(tripRepository.saveAndFlush(trip)).thenReturn(trip);
+        var day = new PlannerBlockDto("day", "itinerary", "Day 1", LocalDate.of(2026, 10, 14), "blue",
+                List.of(section("evening", null, null, null)), null);
+
+        plannerService.savePlannerSnapshot(TRIP_ID, USER_ID, new PlannerSnapshotRequest(1L, List.of(day)));
+
+        var item = ArgumentCaptor.forClass(BlockItem.class);
+        verify(blockItemRepository).save(item.capture());
+        assertEquals("", item.getValue().getTitle());
+        assertNull(item.getValue().getSectionColor());
+        assertNull(item.getValue().getSectionDestinationId());
+        assertNull(item.getValue().getSectionDestinationLat());
+    }
+
+    @Test
+    void aSectionTurnedIntoANoteDropsItsColourAndCity() {
+        Trip trip = ownedTrip(1L);
+        ListBlock existingBlock = ListBlock.builder().id(BLOCK_ID).tripId(TRIP_ID).clientId("day").build();
+        BlockItem existing = BlockItem.builder().id(ITEM_ID).blockId(BLOCK_ID).clientId("shared-id")
+                .type(BlockItem.BlockItemType.SECTION).title("Osaka").sectionColor("coral")
+                .sectionDestinationId("osaka").sectionDestinationName("Osaka")
+                .sectionDestinationLat(34.69).sectionDestinationLng(135.5).build();
+        when(tripRepository.findOwnedForUpdate(TRIP_ID, USER_ID)).thenReturn(Optional.of(trip));
+        when(listBlockRepository.findByTripIdOrderByDisplayOrder(TRIP_ID)).thenReturn(List.of(existingBlock));
+        when(listBlockRepository.save(any(ListBlock.class))).thenAnswer(call -> call.getArgument(0));
+        when(blockItemRepository.findByBlockIdOrderByDisplayOrder(BLOCK_ID)).thenReturn(List.of(existing));
+        when(blockItemRepository.save(any(BlockItem.class))).thenAnswer(call -> call.getArgument(0));
+        when(tripRepository.saveAndFlush(trip)).thenReturn(trip);
+        PlannerItemDto note = new PlannerItemDto("shared-id", "note", null, null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, "Now a note", null, null);
+        var day = new PlannerBlockDto("day", "itinerary", "Day 1", LocalDate.of(2026, 10, 14), "blue", List.of(note), null);
+
+        plannerService.savePlannerSnapshot(TRIP_ID, USER_ID, new PlannerSnapshotRequest(1L, List.of(day)));
+
+        assertEquals(BlockItem.BlockItemType.NOTE, existing.getType());
+        assertNull(existing.getSectionColor());
+        assertNull(existing.getSectionDestinationName());
+        assertNull(existing.getSectionDestinationLng());
+    }
+
+    @Test
+    void rejectsASectionColourThatIsNotAColourNameBeforeWriting() {
+        when(tripRepository.findOwnedForUpdate(TRIP_ID, USER_ID)).thenReturn(Optional.of(ownedTrip(1L)));
+        var day = new PlannerBlockDto("day", "itinerary", "Day 1", LocalDate.of(2026, 10, 14), "blue",
+                List.of(section("bad", "Bad", "#ff0000", null)), null);
+
+        assertThrows(PlannerService.PlannerValidationException.class,
+                () -> plannerService.savePlannerSnapshot(TRIP_ID, USER_ID, new PlannerSnapshotRequest(1L, List.of(day))));
+        verify(blockItemRepository, never()).save(any());
+    }
+
+    @Test
+    void rejectsASectionCityWithCoordinatesOutsideTheWorldBeforeWriting() {
+        when(tripRepository.findOwnedForUpdate(TRIP_ID, USER_ID)).thenReturn(Optional.of(ownedTrip(1L)));
+        PlannerDestinationDto broken = new PlannerDestinationDto("x", "Nowhere", 91.0, 0.0, null);
+        var day = new PlannerBlockDto("day", "itinerary", "Day 1", LocalDate.of(2026, 10, 14), "blue",
+                List.of(section("bad", "Bad", null, broken)), null);
+
+        assertThrows(PlannerService.PlannerValidationException.class,
+                () -> plannerService.savePlannerSnapshot(TRIP_ID, USER_ID, new PlannerSnapshotRequest(1L, List.of(day))));
+        verify(blockItemRepository, never()).save(any());
+    }
+
+    private PlannerItemDto section(String id, String title, String colorId, PlannerDestinationDto destination) {
+        return new PlannerItemDto(id, "section", null, null, null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, title, null, null, null, null, null, null, null,
+                colorId, destination);
+    }
+
     private PlannerBlockDto anchoredBlock(PlannerAnchorDto start, PlannerAnchorDto end) {
         return new PlannerBlockDto("block-day-1", "itinerary", "Day 1",
                 LocalDate.of(2026, 9, 1), "amber", List.of(), null, start, end);

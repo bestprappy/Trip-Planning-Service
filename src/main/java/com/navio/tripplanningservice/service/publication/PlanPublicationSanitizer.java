@@ -226,6 +226,8 @@ public class PlanPublicationSanitizer {
             // dropped entirely rather than published as empty shells.
             case "note" -> options.includeNotes() ? sanitizeNote(item) : null;
             case "checklist" -> options.includeNotes() ? sanitizeChecklist(item) : null;
+            // A section is structure, like the day itself: it travels with the stops.
+            case "section" -> sanitizeSection(item);
             default -> null;
         };
     }
@@ -264,6 +266,12 @@ public class PlanPublicationSanitizer {
 
     private boolean isCoordinate(Double value, double bound) {
         return value != null && Double.isFinite(value) && Math.abs(value) <= bound;
+    }
+
+    private PublicItemDto sanitizeSection(PlannerItemDto item) {
+        String colorId = item.colorId() != null && item.colorId().matches("[a-z]{1,32}") ? item.colorId() : null;
+        String city = item.destination() == null ? null : safeText(item.destination().name());
+        return PublicItemDto.section(safeText(item.title()), colorId, city);
     }
 
     private PublicItemDto sanitizeNote(PlannerItemDto item) {

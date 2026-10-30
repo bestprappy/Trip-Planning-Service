@@ -61,6 +61,9 @@ public class PlannerService {
      */
     private static final Set<String> ANCHOR_KINDS = Set.of("SAVED_PLACE", "PLACE", "MANUAL");
 
+    /** Colour ids are palette names such as {@code coral}; the client owns the palette. */
+    private static final java.util.regex.Pattern SECTION_COLOR = java.util.regex.Pattern.compile("[a-z]{1,32}");
+
     private final TripRepository tripRepository;
     private final ListBlockRepository listBlockRepository;
     private final BlockItemRepository blockItemRepository;
@@ -242,6 +245,7 @@ public class PlannerService {
         item.setEndTime(endTime);
         ItemSchedules.apply(item, dto.type(), dto.schedule());
         item.setEstimatedCost(toMoney(dto.cost()));
+        applySection(item, itemType == BlockItem.BlockItemType.SECTION ? dto : null);
 
         PlannerEvChargerDto evCharger = dto.evCharger();
         item.setTargetBatteryPct(evCharger == null ? null : evCharger.targetBatteryPct());
@@ -265,6 +269,17 @@ public class PlannerService {
             item.setEvLocked(Boolean.TRUE.equals(evCharger.locked()));
             item.setIsCharged(Boolean.TRUE.equals(dto.isVisited()));
         }
+    }
+
+    /** Only a section divider carries a colour and a city; any other item clears them. */
+    private void applySection(BlockItem item, PlannerItemDto section) {
+        PlannerDestinationDto destination = section == null ? null : section.destination();
+        item.setSectionColor(section == null ? null : section.colorId());
+        item.setSectionDestinationId(destination == null ? null : destination.id());
+        item.setSectionDestinationName(destination == null ? null : destination.name());
+        item.setSectionDestinationLat(destination == null ? null : destination.lat());
+        item.setSectionDestinationLng(destination == null ? null : destination.lng());
+        item.setSectionDestinationCountry(destination == null ? null : destination.country());
     }
 
     private void syncChecklistItems(
@@ -385,7 +400,7 @@ public class PlannerService {
                 blocks,
                 budget,
                 trip.getVersion(),
-                trip.getUpdatedAt(), List.of("day-destinations", "charge-targets", "day-anchors", "trip-energy-v1", "observed-soc-v1", "trip-garage-v1", "canonical-optimization-v1", "leg-travel-mode-v1", "cycling-legs-v1", "transit-preferences-v1", "transit-route-choice-v1", "precise-charging-v1", "time-source-v1", "item-schedule-v1", "publication-sections-v1", "trip-vehicles-v1"),
+                trip.getUpdatedAt(), List.of("day-destinations", "charge-targets", "day-anchors", "trip-energy-v1", "observed-soc-v1", "trip-garage-v1", "canonical-optimization-v1", "leg-travel-mode-v1", "cycling-legs-v1", "transit-preferences-v1", "transit-route-choice-v1", "precise-charging-v1", "time-source-v1", "item-schedule-v1", "publication-sections-v1", "trip-vehicles-v1", "day-sections-v1"),
                 PlannerEnergyState.read(trip));
     }
 
@@ -420,8 +435,10 @@ public class PlannerService {
         String itemType = switch (item.getType()) {
             case NOTE -> "note";
             case CHECKLIST, CHECKLIST_ITEM -> "checklist";
+            case SECTION -> "section";
             default -> "place";
         };
+        boolean isSection = "section".equals(itemType);
 
         List<PlannerChecklistSubItemDto> checklistItems = "checklist".equals(itemType)
                 ? checklistSubItemRepository.findByItemIdOrderByDisplayOrder(item.getId())
@@ -466,7 +483,7 @@ public class PlannerService {
                 item.getEstimatedCost() == null ? null : item.getEstimatedCost().doubleValue(),
                 evCharger,
                 "note".equals(itemType) ? Objects.requireNonNullElse(item.getNotes(), "") : null,
-                "checklist".equals(itemType) ? item.getTitle() : null,
+                "checklist".equals(itemType) || isSection ? item.getTitle() : null,
                 checklistItems, PlannerEnergyState.readObservation(item),
                 "place".equals(itemType) ? item.getPlaceType() : null,
                 "place".equals(itemType) && item.getArrivalMode() != null
@@ -475,17 +492,18 @@ public class PlannerService {
                 "place".equals(itemType) && item.getArrivalRouteKey() != null
                         ? com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.textNode(item.getArrivalRouteKey()) : null,
                 "place".equals(itemType) ? item.getTimeSource() : null,
-                "place".equals(itemType) ? ItemSchedules.read(item) : null);
+                "place".equals(itemType) ? ItemSchedules.read(item) : null,
+                isSection ? item.getSectionColor() : null,
+                isSection && item.getSectionDestinationId() != null ? new PlannerDestinationDto(
+                        item.getSectionDestinationId(), item.getSectionDestinationName(),
+                        item.getSectionDestinationLat(), item.getSectionDestinationLng(),
+                        item.getSectionDestinationCountry()) : null);
     }
 
     private void validateSnapshot(PlannerSnapshotRequest request) {
         Set<String> blockIds = new java.util.HashSet<>();
         for (PlannerBlockDto block : nullSafe(request.blocks())) {
-            PlannerDestinationDto destination = block.destination();
-            if (destination != null && (isBlank(destination.id()) || isBlank(destination.name())
-                    || destination.lat() == null || destination.lng() == null
-                    || !Double.isFinite(destination.lat()) || Math.abs(destination.lat()) > 90
-                    || !Double.isFinite(destination.lng()) || Math.abs(destination.lng()) > 180)) {
+            if (!isValidDestination(block.destination())) {
                 throw new PlannerValidationException("Day destination must have a name and valid coordinates");
             }
             validateAnchor(block.startAnchor(), "Day start");
@@ -507,6 +525,8 @@ public class PlannerService {
                     throw new PlannerValidationException("Note items require content");
                 } else if (itemType == BlockItem.BlockItemType.CHECKLIST && item.title() == null) {
                     throw new PlannerValidationException("Checklist items require a title");
+                } else if (itemType == BlockItem.BlockItemType.SECTION) {
+                    validateSection(item);
                 }
 
                 Set<String> subItemIds = new java.util.HashSet<>();
@@ -520,6 +540,22 @@ public class PlannerService {
 
         if (request.budget() != null) {
             validateBudget(request.budget());
+        }
+    }
+
+    private boolean isValidDestination(PlannerDestinationDto destination) {
+        return destination == null || (!isBlank(destination.id()) && !isBlank(destination.name())
+                && destination.lat() != null && destination.lng() != null
+                && Double.isFinite(destination.lat()) && Math.abs(destination.lat()) <= 90
+                && Double.isFinite(destination.lng()) && Math.abs(destination.lng()) <= 180);
+    }
+
+    private void validateSection(PlannerItemDto section) {
+        if (section.colorId() != null && !SECTION_COLOR.matcher(section.colorId()).matches()) {
+            throw new PlannerValidationException("Section colour must be a colour name");
+        }
+        if (!isValidDestination(section.destination())) {
+            throw new PlannerValidationException("Section city must have a name and valid coordinates");
         }
     }
 
@@ -610,6 +646,7 @@ public class PlannerService {
             case "place" -> BlockItem.BlockItemType.PLACE;
             case "note" -> BlockItem.BlockItemType.NOTE;
             case "checklist" -> BlockItem.BlockItemType.CHECKLIST;
+            case "section" -> BlockItem.BlockItemType.SECTION;
             default -> throw new PlannerValidationException("Unsupported planner item type: " + value);
         };
     }
@@ -625,7 +662,7 @@ public class PlannerService {
     private String resolveTitle(PlannerItemDto dto, BlockItem.BlockItemType type) {
         return switch (type) {
             case PLACE, EV_STATION -> Objects.requireNonNullElse(dto.name(), "Place");
-            case CHECKLIST, CHECKLIST_ITEM -> Objects.requireNonNullElse(dto.title(), "");
+            case CHECKLIST, CHECKLIST_ITEM, SECTION -> Objects.requireNonNullElse(dto.title(), "");
             case NOTE -> "Note";
             default -> Objects.requireNonNullElse(dto.title(), type.name());
         };

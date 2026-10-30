@@ -3,6 +3,7 @@ package com.navio.tripplanningservice.dto;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 import java.util.List;
@@ -38,8 +39,21 @@ public record PlannerItemDto(
         // "fixed" or "calculated"; omitted keeps the saved source only while the times are unchanged.
         @Size(max = 16) String timeSource,
         // Moments inside the stop; omitted keeps the saved schedule, an empty list clears it.
-        @Size(max = 40) List<@Valid PlannerScheduleEntryDto> schedule
+        @Size(max = 40) List<@Valid PlannerScheduleEntryDto> schedule,
+        // Section dividers only: the colour of the stops after it, null for the day's colour.
+        @Size(max = 32) @Pattern(regexp = "[a-z]+", message = "colorId must be a colour name") String colorId,
+        // Section dividers only: the city this part of the day is in.
+        @Valid PlannerDestinationDto destination
 ) {
+    public PlannerItemDto(String id, String type, String placeId, String name, String description, String address,
+        Double lat, Double lng, Double rating, Integer reviewCount, String imageUrl, String notes, Boolean isVisited,
+        String time, String timeEnd, Double cost, PlannerEvChargerDto evCharger, String content, String title,
+        List<PlannerChecklistSubItemDto> items, com.fasterxml.jackson.databind.JsonNode observedSocCheckpoint,
+        String placeType, com.fasterxml.jackson.databind.JsonNode arrivalMode,
+        com.fasterxml.jackson.databind.JsonNode arrivalRouteKey, String timeSource,
+        List<PlannerScheduleEntryDto> schedule) {
+        this(id,type,placeId,name,description,address,lat,lng,rating,reviewCount,imageUrl,notes,isVisited,time,timeEnd,cost,evCharger,content,title,items,observedSocCheckpoint,placeType,arrivalMode,arrivalRouteKey,timeSource,schedule,null,null);
+    }
     public PlannerItemDto(String id, String type, String placeId, String name, String description, String address,
         Double lat, Double lng, Double rating, Integer reviewCount, String imageUrl, String notes, Boolean isVisited,
         String time, String timeEnd, Double cost, PlannerEvChargerDto evCharger, String content, String title,

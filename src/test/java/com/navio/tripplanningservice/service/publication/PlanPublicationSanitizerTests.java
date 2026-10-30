@@ -214,6 +214,24 @@ class PlanPublicationSanitizerTests {
     }
 
     @Test
+    void publishesASectionsTitleColourAndCityNameButNotTheCitysCoordinates() {
+        PlannerItemDto section = new PlannerItemDto("s1", "section", null, null, null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, "Afternoon", null, null, null, null, null, null, null,
+                "coral", new PlannerDestinationDto("osaka", "Osaka", 34.69, 135.5, "Japan"));
+        PlannerBlockDto day = itineraryDay("d1", LocalDate.of(2026, 3, 1)).withItems(section).build();
+
+        PublicItemDto published = sanitizeDays(day, PublicationOptions.none()).getFirst().items().getFirst();
+
+        assertThat(published.type()).isEqualTo("section");
+        assertThat(published.name()).isEqualTo("Afternoon");
+        assertThat(published.colorId()).isEqualTo("coral");
+        assertThat(published.city()).isEqualTo("Osaka");
+        assertThat(published.lat()).isNull();
+        assertThat(published.lng()).isNull();
+        assertThat(published.placeId()).isNull();
+    }
+
+    @Test
     void publishesAStopsLocationSoItCanBeMappedAndCopied() {
         PlannerBlockDto day = itineraryDay("d1", LocalDate.of(2026, 3, 1))
                 .withItems(place("i1", "Wat Arun").build())
