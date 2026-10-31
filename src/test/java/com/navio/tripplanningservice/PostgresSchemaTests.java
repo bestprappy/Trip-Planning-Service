@@ -68,8 +68,8 @@ class PostgresSchemaTests {
                 // V14 energy state, V15 garage membership, V16 stop arrival mode,
                 // V17 precise charging plan, V18 transit route choice, V19 time source, V20 stop schedule,
                 // V21 copy events, V22 shared sections and trip vehicles, V23 day sections,
-                // and V24 profile pins.
-                assertThat(upgraded.migrate().migrationsExecuted).isEqualTo(11);
+                // V24 profile pins, and V25 the trip.events.v1 outbox.
+                assertThat(upgraded.migrate().migrationsExecuted).isEqualTo(12);
                 upgraded.validate();
                 try (var connection = java.sql.DriverManager.getConnection(upgradeUrl, username, password);
                      var sql = connection.createStatement(); var row = sql.executeQuery("SELECT count(*) FROM trip.shared_plan_copy WHERE publication_id='33333333-3333-4333-8333-333333333333'")) {

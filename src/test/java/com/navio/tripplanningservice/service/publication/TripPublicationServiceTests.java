@@ -58,6 +58,7 @@ class TripPublicationServiceTests {
     @Mock ShareTokenGenerator tokenGenerator;
     @Mock TripService tripService;
     @Mock com.navio.tripplanningservice.repository.SharedPlanCopyRepository copyEvents;
+    @Mock PublicationEvents publicationEvents;
 
     private TripPublicationService service;
 
@@ -70,7 +71,7 @@ class TripPublicationServiceTests {
                 new PlanPublicationSanitizer(),
                 tokenGenerator,
                 new ObjectMapper().registerModule(new JavaTimeModule()),
-                new ExplorePlanSummarizer(), tripService, copyEvents);
+                new ExplorePlanSummarizer(), tripService, copyEvents, publicationEvents);
     }
 
     // ---------------------------------------------------------- authorization
@@ -757,6 +758,48 @@ class TripPublicationServiceTests {
         service.updateExploreListing(TRIP, OWNER, true, "Kanya S.");
 
         assertThat(published.getAuthorDisplayName()).isEqualTo("Kanya S.");
+    }
+
+    // ------------------------------------------------- follower announcements
+
+    @Test
+    void publishingHandsTheEventRecorderAFreshStateAndTheTripOwner() {
+        givenOwnedTripAtVersion(3L);
+        when(publicationRepository.findByTripId(TRIP)).thenReturn(Optional.empty());
+        when(tokenGenerator.generate()).thenReturn("tok-named");
+        when(publicationRepository.saveAndFlush(any())).thenAnswer(call -> call.getArgument(0));
+
+        service.publish(TRIP, OWNER, new PublishPlanRequest(3L, null, PublicationOptions.none(), true, "Kanya S."));
+
+        ArgumentCaptor<TripPublication> after = ArgumentCaptor.forClass(TripPublication.class);
+        verify(publicationEvents).recordChange(org.mockito.ArgumentMatchers.eq(PublicationEvents.Before.NONE),
+                after.capture(), org.mockito.ArgumentMatchers.eq(OWNER));
+        assertThat(after.getValue().getToken()).isEqualTo("tok-named");
+        assertThat(after.getValue().isListed()).isTrue();
+    }
+
+    @Test
+    void listingCapturesTheStateBeforeTheChangeSoAnUnlistedPlanCanBeAnnounced() {
+        givenOwnedTripAtVersion(3L);
+        TripPublication published = activePublication(2);
+        when(publicationRepository.findByTripId(TRIP)).thenReturn(Optional.of(published));
+        when(publicationRepository.saveAndFlush(any())).thenAnswer(call -> call.getArgument(0));
+
+        service.updateExploreListing(TRIP, OWNER, true, "Kanya S.");
+
+        verify(publicationEvents).recordChange(
+                org.mockito.ArgumentMatchers.eq(new PublicationEvents.Before(false, "tok-existing")),
+                org.mockito.ArgumentMatchers.same(published), org.mockito.ArgumentMatchers.eq(OWNER));
+    }
+
+    @Test
+    void aStrangerListingSomeoneElsesPlanRecordsNoEvent() {
+        when(tripRepository.findByIdAndUserId(TRIP, STRANGER)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.updateExploreListing(TRIP, STRANGER, true, "Mallory"))
+                .isInstanceOf(TripService.TripNotFoundException.class);
+
+        verifyNoInteractions(publicationEvents);
     }
 
     @Test

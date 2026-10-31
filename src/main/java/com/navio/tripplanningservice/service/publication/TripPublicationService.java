@@ -67,6 +67,7 @@ public class TripPublicationService {
     private final ExplorePlanSummarizer summarizer;
     private final TripService tripService;
     private final com.navio.tripplanningservice.repository.SharedPlanCopyRepository copyEvents;
+    private final PublicationEvents publicationEvents;
 
     public PublicationResponse getPublication(UUID tripId, UUID userId) {
         Trip trip = requireOwnedTrip(tripId, userId);
@@ -103,6 +104,7 @@ public class TripPublicationService {
 
         Optional<TripPublication> existing = publicationRepository.findByTripId(tripId);
         requireExpectedRevision(existing, request.expectedRevision());
+        PublicationEvents.Before before = PublicationEvents.Before.of(existing.orElse(null));
 
         PublicationOptions options = request.safeOptions();
         PublicPlanSnapshot sanitized = sanitizer.withPublicTitle(sanitizer.sanitize(
@@ -138,6 +140,7 @@ public class TripPublicationService {
         publication.setRevision(publication.getRevision() + 1);
 
         TripPublication saved = publicationRepository.saveAndFlush(publication);
+        publicationEvents.recordChange(before, saved, trip.getUserId());
         log.info("Published plan for trip {} at revision {}", tripId, saved.getRevision());
         return describe(saved, trip);
     }
@@ -217,6 +220,7 @@ public class TripPublicationService {
                 .filter(TripPublication::isActive)
                 .orElseThrow(() -> new PublicationConflictException(
                         "Publish this plan before listing it on Explore"));
+        PublicationEvents.Before before = PublicationEvents.Before.of(publication);
 
         publication.applyListing(listed, Instant.now());
         if (authorDisplayName != null) {
@@ -225,6 +229,7 @@ public class TripPublicationService {
             publication.setAuthorDisplayName(sanitizer.sanitizeAuthorName(authorDisplayName));
         }
         TripPublication saved = publicationRepository.saveAndFlush(publication);
+        publicationEvents.recordChange(before, saved, trip.getUserId());
         log.info("{} trip {} on Explore", listed ? "Listed" : "Unlisted", tripId);
         return describe(saved, trip);
     }
