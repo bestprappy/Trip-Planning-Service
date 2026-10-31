@@ -3,6 +3,7 @@ package com.navio.tripplanningservice.controller;
 import com.navio.tripplanningservice.dto.publication.ExplorePlanSummary;
 import com.navio.tripplanningservice.dto.publication.SharedPlanResponse;
 import com.navio.tripplanningservice.dto.TripResponse;
+import com.navio.tripplanningservice.service.publication.ProfilePlanService;
 import com.navio.tripplanningservice.service.publication.SharedPlanSummaryService;
 import com.navio.tripplanningservice.service.publication.TripPublicationService;
 import lombok.RequiredArgsConstructor;
@@ -11,7 +12,9 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -45,6 +48,7 @@ public class SharedPlanController {
 
     private final TripPublicationService publicationService;
     private final SharedPlanSummaryService summaryService;
+    private final ProfilePlanService profilePlans;
 
     /**
      * The Explore feed. Short {@code no-store} for the same reason as a single
@@ -95,6 +99,45 @@ public class SharedPlanController {
         return ResponseEntity.ok().cacheControl(CacheControl.noStore())
             .header("X-Robots-Tag","noindex, nofollow, noarchive")
             .body(summaryService.bookmarkReference(token));
+    }
+
+    /**
+     * One traveler's plans for their public profile: listed on Explore under their
+     * name, pinned first. Requires a signed-in caller (the gateway supplies
+     * {@code X-User-Id}); unlike the Explore feed this links plans to an account.
+     */
+    @GetMapping("/by-author/{owner}")
+    public ResponseEntity<Page<ProfilePlanService.ProfilePlanSummary>> listedByAuthor(
+            @RequestHeader(name = "X-User-Id") UUID viewer,
+            @PathVariable UUID owner,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        Pageable pageable = PageRequest.of(Math.max(page, 0), Math.clamp(size, 1, MAX_PAGE_SIZE));
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(profilePlans.listedBy(owner, pageable));
+    }
+
+    /**
+     * The account behind a named Explore listing, so a byline can link to its
+     * profile. Signed-in callers only; never answered for an anonymous listing.
+     */
+    @GetMapping("/{token}/author")
+    public ResponseEntity<ProfilePlanService.PlanAuthor> author(
+            @RequestHeader(name = "X-User-Id") UUID viewer, @PathVariable String token) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(profilePlans.authorOf(token));
+    }
+
+    /** Features one of the caller's own listed plans on their profile. */
+    @PutMapping("/{token}/pin")
+    public ResponseEntity<ProfilePlanService.ProfilePlanSummary> pin(
+            @RequestHeader(name = "X-User-Id") UUID userId, @PathVariable String token) {
+        return ResponseEntity.ok(profilePlans.pin(token, userId, true));
+    }
+
+    @DeleteMapping("/{token}/pin")
+    public ResponseEntity<Void> unpin(@RequestHeader(name = "X-User-Id") UUID userId, @PathVariable String token) {
+        profilePlans.pin(token, userId, false);
+        return ResponseEntity.noContent().build();
     }
 
     /** Authenticated copy of a listed, still published plan into the caller's account. */

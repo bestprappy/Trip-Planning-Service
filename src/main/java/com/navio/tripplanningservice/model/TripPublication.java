@@ -120,6 +120,10 @@ public class TripPublication {
     @Column
     private Instant revokedAt;
 
+    /** When the owner featured this plan on their profile; cleared when it stops being listed. */
+    @Column
+    private Instant profilePinnedAt;
+
     public boolean isActive() {
         return status == PublicationStatus.ACTIVE && token != null;
     }
@@ -139,6 +143,7 @@ public class TripPublication {
         }
         if (!listed) {
             listedAt = null;
+            profilePinnedAt = null;
         }
         listedInExplore = listed;
     }

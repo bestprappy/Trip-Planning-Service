@@ -58,6 +58,34 @@ public interface TripPublicationRepository extends JpaRepository<TripPublication
             @Param("minimumSanitizerVersion") int minimumSanitizerVersion,
             Pageable pageable);
 
+    /**
+     * One owner's plans for their public profile: listed on Explore, active, and
+     * published under their name. A plan listed anonymously is never attributed.
+     * Pinned plans come first.
+     */
+    @Query("""
+            select p from TripPublication p, Trip t
+            where t.id = p.tripId and t.userId = :owner
+              and p.listedInExplore = true
+              and p.status = com.navio.tripplanningservice.model.TripPublication.PublicationStatus.ACTIVE
+              and p.token is not null
+              and p.authorDisplayName is not null
+              and p.sanitizerVersion >= :minimumSanitizerVersion
+            order by p.profilePinnedAt desc nulls last, p.listedAt desc
+            """)
+    Page<TripPublication> findListedByOwner(
+            @Param("owner") UUID owner,
+            @Param("minimumSanitizerVersion") int minimumSanitizerVersion,
+            Pageable pageable);
+
+    @Query("""
+            select count(p) from TripPublication p, Trip t
+            where t.id = p.tripId and t.userId = :owner and p.profilePinnedAt is not null
+              and p.listedInExplore = true
+              and p.status = com.navio.tripplanningservice.model.TripPublication.PublicationStatus.ACTIVE
+            """)
+    long countPinnedByOwner(@Param("owner") UUID owner);
+
     @Modifying
     @Query("update TripPublication p set p.viewCount = p.viewCount + 1 where p.id = :id")
     void incrementViewCount(@Param("id") UUID id);

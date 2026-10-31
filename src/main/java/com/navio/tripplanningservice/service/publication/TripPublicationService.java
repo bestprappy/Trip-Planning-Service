@@ -244,7 +244,11 @@ public class TripPublicationService {
         Page<TripPublication> rows = trending
                 ? publicationRepository.findTrendingInExplore(PlanPublicationSanitizer.SANITIZER_VERSION, pageable)
                 : publicationRepository.findListedInExplore(PlanPublicationSanitizer.SANITIZER_VERSION, pageable);
+        return summarize(rows, pageable);
+    }
 
+    /** Explore cards for already-authorized rows, in their order; unreadable snapshots are skipped. */
+    public Page<ExplorePlanSummary> summarize(Page<TripPublication> rows, Pageable pageable) {
         var counts = copyEvents.counts(rows.getContent().stream().map(TripPublication::getId)
                 .filter(Objects::nonNull).toList());
         List<ExplorePlanSummary> summaries = new ArrayList<>(rows.getNumberOfElements());

@@ -51,6 +51,39 @@ class SharedPlanControllerTests {
     @MockitoBean
     private SharedPlanSummaryService summaryService;
 
+    @MockitoBean
+    private com.navio.tripplanningservice.service.publication.ProfilePlanService profilePlans;
+
+    @Test
+    void profilePlanListingsRequireTheGatewayIdentity() throws Exception {
+        mockMvc.perform(get("/v1/shared-plans/by-author/{owner}", UUID.randomUUID()))
+                .andExpect(status().isBadRequest());
+        org.mockito.Mockito.verifyNoInteractions(profilePlans);
+    }
+
+    @Test
+    void profilePlanListingsAreNotCachedAndClampThePageSize() throws Exception {
+        UUID owner = UUID.randomUUID();
+        when(profilePlans.listedBy(org.mockito.ArgumentMatchers.eq(owner), any()))
+                .thenReturn(new PageImpl<>(List.of()));
+        mockMvc.perform(get("/v1/shared-plans/by-author/{owner}", owner).param("size", "500")
+                        .header("X-User-Id", UUID.randomUUID()))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", org.hamcrest.Matchers.containsString("no-store")));
+        ArgumentCaptor<Pageable> page = ArgumentCaptor.forClass(Pageable.class);
+        verify(profilePlans).listedBy(org.mockito.ArgumentMatchers.eq(owner), page.capture());
+        assertThat(page.getValue().getPageSize()).isEqualTo(48);
+    }
+
+    @Test
+    void pinningActsAsTheGatewayIdentityAndNeedsOne() throws Exception {
+        UUID owner = UUID.randomUUID();
+        mockMvc.perform(put("/v1/shared-plans/{token}/pin", TOKEN)).andExpect(status().isBadRequest());
+        mockMvc.perform(delete("/v1/shared-plans/{token}/pin", TOKEN).header("X-User-Id", owner))
+                .andExpect(status().isNoContent());
+        verify(profilePlans).pin(TOKEN, owner, false);
+    }
+
     @Test
     void servesAPublishedPlanToACallerWithNoIdentityAtAll() throws Exception {
         when(publicationService.readSharedPlan(TOKEN)).thenReturn(sharedPlan());

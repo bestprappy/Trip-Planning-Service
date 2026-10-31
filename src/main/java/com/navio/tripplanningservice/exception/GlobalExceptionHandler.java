@@ -198,6 +198,18 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
     }
 
+    @ExceptionHandler(com.navio.tripplanningservice.service.publication.ProfilePlanService.ProfilePinException.class)
+    public ResponseEntity<ErrorResponse> handleProfilePin(
+            com.navio.tripplanningservice.service.publication.ProfilePlanService.ProfilePinException ex) {
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .timestamp(Instant.now())
+                .status(HttpStatus.CONFLICT.value())
+                .message(ex.getMessage())
+                .error("List the plan on Explore with your name shown, or unpin another plan")
+                .build();
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(errorResponse);
+    }
+
     @ExceptionHandler(TripPublicationService.PublicationConflictException.class)
     public ResponseEntity<ErrorResponse> handlePublicationConflict(
             TripPublicationService.PublicationConflictException ex) {
