@@ -15,6 +15,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class SharedPlanSearchPostgresTests {
  @Autowired EntityManager em;
  @Autowired ExploreSearchRepository repository;
+ @Autowired javax.sql.DataSource dataSource;
  @Test void databaseStreamIncludesOnlyCurrentListedActivePublications(){
   UUID owner=UUID.randomUUID();for(int i=0;i<4;i++){
    UUID trip=UUID.randomUUID();em.createNativeQuery("INSERT INTO trip.trip(id,user_id,start_date,end_date,destination_id,destination_name) VALUES(:id,:owner,CURRENT_DATE,CURRENT_DATE,'test','Test')").setParameter("id",trip).setParameter("owner",owner).executeUpdate();
@@ -23,5 +24,18 @@ class SharedPlanSearchPostgresTests {
     .setParameter("version",i==2?0:PlanPublicationSanitizer.SANITIZER_VERSION).setParameter("listed",i==0||i==2).setParameter("at",java.time.Instant.now()).setParameter("status",i==3?"REVOKED":"ACTIVE").executeUpdate();
   }
   try(var rows=repository.streamListed(PlanPublicationSanitizer.SANITIZER_VERSION)){assertThat(rows.map(row->row.getToken()).toList()).containsExactly("search-test-0");}
+ }
+
+ @Test void twoPassContextSearchUsesRealJsonbAndSeparateMatchingRelatedPools(){
+  for(int i=0;i<2;i++){
+   UUID trip=UUID.randomUUID();em.createNativeQuery("INSERT INTO trip.trip(id,user_id,start_date,end_date,destination_id,destination_name) VALUES(:id,:owner,CURRENT_DATE,CURRENT_DATE,'test','Test')").setParameter("id",trip).setParameter("owner",UUID.randomUUID()).executeUpdate();
+   String snapshot="{\"sanitizerVersion\":"+PlanPublicationSanitizer.SANITIZER_VERSION+",\"title\":\"Quiet coast\",\"destinationCity\":\"Hua Hin\",\"destinationCountry\":\"Thailand\",\"dayCount\":4,\"days\":[{\"items\":[{\"type\":\"place\",\"name\":\""+(i==0?"Seafood restaurant":"Quiet park")+"\",\"placeType\":\""+(i==0?"restaurant":"park")+"\"}]}]}";
+   em.createNativeQuery("INSERT INTO trip.trip_publication(id,trip_id,token,snapshot,sanitizer_version,source_trip_version,listed_in_explore,listed_at,status) VALUES(:id,:trip,:token,CAST(:snapshot AS jsonb),:version,0,true,:at,'ACTIVE')")
+    .setParameter("id",UUID.randomUUID()).setParameter("trip",trip).setParameter("token","context-test-"+i).setParameter("snapshot",snapshot).setParameter("version",PlanPublicationSanitizer.SANITIZER_VERSION).setParameter("at",java.time.Instant.now()).executeUpdate();
+  }
+  var search=new com.navio.tripplanningservice.service.publication.SharedPlanSearchService(repository,new com.fasterxml.jackson.databind.ObjectMapper().findAndRegisterModules(),new com.navio.tripplanningservice.service.publication.ExplorePlanSummarizer(),new com.navio.tripplanningservice.repository.SharedPlanCopyRepository(org.springframework.jdbc.core.simple.JdbcClient.create(dataSource)));
+  var result=search.search("Huahin food trip","TH",4,0,12,"relevance");
+  assertThat(result.matching()).extracting(p->p.token()).containsExactly("context-test-0");
+  assertThat(result.related()).extracting(p->p.token()).containsExactly("context-test-1");
  }
 }

@@ -60,4 +60,70 @@ class SharedPlanSearchServiceTests {
   rows(row("a","Bangkok Trip","Bangkok","Thailand",3));var result=service.search("ban","",null,0,12,"relevance");
   assertThat(result.destinations()).anyMatch(d->d.label().equals("Bangkok"));assertThat(result.plans()).extracting(p->p.title()).contains("Bangkok Trip");
  }
+
+ TripPublication withPlaces(TripPublication value,String type,String name,String address){
+  value.setSnapshot(value.getSnapshot().replace("\"days\":[]","\"days\":[{\"items\":[{\"type\":\"place\",\"placeType\":\""+type+"\",\"name\":\""+name+"\",\"address\":\""+address+"\"}]}]"));return value;
+ }
+ @Test void contextualQuerySeparatesStrongAndRelatedWithoutIgnoringGeography(){
+  rows(withPlaces(row("hua","Coast escape","Hua Hin","Thailand",3),"restaurant","Beach seafood restaurant","Hua Hin, Thailand"),
+       withPlaces(row("bangkok","Market weekend","Bangkok","Thailand",3),"restaurant","Food market","Bangkok, Thailand"),
+       withPlaces(row("japan","Food tour","Tokyo","Japan",3),"restaurant","Food market","Tokyo, Japan"));
+  var result=service.search("Huahin scenary and food trip","",null,0,12,"relevance");
+  assertThat(result.matching()).extracting(p->p.token()).containsExactly("hua");
+  assertThat(result.related()).extracting(p->p.token()).containsExactly("bangkok");
+  assertThat(result.correction()).contains("Hua Hin").contains("scenic");
+ }
+ @Test void relatedTitlesRemainWhenNoStrongPlanMatchesAndFiltersNeverRelax(){
+  rows(row("thai","Quiet escape","Hua Hin","Thailand",4),row("other","Quiet escape","Tokyo","Japan",4));
+  var result=service.search("Thailand food trip","",null,0,12,"relevance");
+  assertThat(result.matching()).isEmpty();assertThat(result.relatedPlans()).extracting(p->p.token()).containsExactly("thai");
+  assertThat(result.relatedTotal()).isEqualTo(1);assertThat(result.reasons().get("thai")).contains("Thailand");
+  assertThat(service.search("Thailand food trip","TH",5,0,12,"relevance").related()).isEmpty();
+ }
+ @Test void regionAndFillerWordsDoNotHideRelevantPlansOrShowUnrelatedCountries(){
+  rows(withPlaces(row("ca","Coastal food discoveries","Monterey","United States",4),"restaurant","Seafood restaurant","Monterey, California, USA"),
+       withPlaces(row("fr","Food discoveries","Paris","France",4),"restaurant","Seafood restaurant","Paris, France"));
+  var result=service.search("California food focus trip","",null,0,12,"relevance");
+  assertThat(result.matching()).extracting(p->p.token()).containsExactly("ca");assertThat(result.related()).isEmpty();
+  assertThat(service.search("zxqv invented unknown","",null,0,12,"relevance").related()).isEmpty();
+ }
+ @Test void bothPoolsPaginateWithoutDuplicatesAndSuggestionsDoNotRequireAllWords(){
+  var values=new ArrayList<TripPublication>();for(int i=0;i<30;i++)values.add(row("r"+i,"Quiet escape "+i,"Hua Hin","Thailand",4));
+  rows(values.toArray(TripPublication[]::new));var first=service.search("Thailand food trip","",null,0,12,"relevance");
+  var next=service.search("Thailand food trip","",null,1,12,"relevance");
+  assertThat(first.related()).hasSize(12);assertThat(next.related()).hasSize(12);assertThat(next.related()).doesNotContainAnyElementsOf(first.related());
+  assertThat(first.relatedLast()).isFalse();assertThat(first.destinations()).anyMatch(d->d.label().equals("Thailand"));
+ }
+
+ @Test void sameNameCitiesUseTypedOrSelectedCountryWithoutArbitraryCatalogueOrder(){
+  rows(row("us","Paris walks","Paris","United States",4),row("fr","Paris walks","Paris","France",4),row("jp","Food tour","Tokyo","Japan",4));
+  assertThat(service.search("Paris France","",null,0,12,"relevance").matching()).extracting(p->p.token()).containsExactly("fr");
+  assertThat(service.search("Paris","FR",null,0,12,"relevance").matching()).extracting(p->p.token()).containsExactly("fr");
+  assertThat(service.search("Paris","",null,0,12,"relevance").matching()).extracting(p->p.token()).containsExactlyInAnyOrder("fr","us");
+  assertThat(service.search("Paris food trip","",null,0,12,"relevance").related()).extracting(p->p.token()).doesNotContain("jp");
+ }
+ @Test void legacyClientsDoNotPageThroughRelatedOnlyResults(){
+  var values=new ArrayList<TripPublication>();for(int i=0;i<30;i++)values.add(row("r"+i,"Quiet escape "+i,"Hua Hin","Thailand",4));
+  rows(values.toArray(TripPublication[]::new));var result=service.search("Thailand food trip","",null,0,12,"relevance");
+  assertThat(result.last()).isTrue();assertThat(result.matchingLast()).isTrue();assertThat(result.relatedLast()).isFalse();
+ }
+
+ @Test void shortCountryAliasesStillAnchorMultiwordQueries(){
+  rows(withPlaces(row("uk","Market discoveries","London","United Kingdom",4),"restaurant","Food hall","London, UK"),
+       withPlaces(row("jp","Food discoveries","Tokyo","Japan",4),"restaurant","Food hall","Tokyo, Japan"));
+  var result=service.search("UK food trip","",null,0,12,"relevance");
+  assertThat(result.matching()).extracting(p->p.token()).containsExactly("uk");assertThat(result.related()).isEmpty();
+ }
+
+ @Test void wholeCatalogueCompletesMultiwordCityWhenItWasNotInTheLoadedFeed(){
+  rows(row("hua","Coast escape","Hua Hin","Thailand",4));
+  assertThat(service.search("Thailand Hua Hi","",null,0,12,"relevance").destinations()).anyMatch(d->d.label().equals("Hua Hin"));
+ }
+
+ @Test void specificActivitiesRemainSpecificRatherThanOnlyMatchingTheirBroadTheme(){
+  rows(withPlaces(row("beach","Coast escape","Hua Hin","Thailand",4),"tourist_attraction","Beach viewpoint","Hua Hin, Thailand"),
+       withPlaces(row("mountain","Mountain escape","Hua Hin","Thailand",4),"park","Mountain garden","Hua Hin, Thailand"));
+  var result=service.search("Hua Hin beach trip","",null,0,12,"relevance");
+  assertThat(result.matching()).extracting(p->p.token()).containsExactly("beach");assertThat(result.related()).extracting(p->p.token()).containsExactly("mountain");
+ }
 }

@@ -1,4 +1,5 @@
 package com.navio.tripplanningservice.service.publication;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.navio.tripplanningservice.dto.publication.*;
 import com.navio.tripplanningservice.model.TripPublication;
@@ -9,71 +10,129 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.text.Normalizer;
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Stream;
 
-/** Streams the eligible public catalogue and retains a bounded ranked window. No stale-content
- * cache, private trip joins, mutations or view increments. Indexing can be added if scale requires. */
+/** Public snapshot search. Two streamed passes discover query geography, then rank bounded pools. */
 @Service @RequiredArgsConstructor @Transactional(readOnly=true)
 public class SharedPlanSearchService {
- private final ExploreSearchRepository repository;
- private final ObjectMapper mapper;
- private final ExplorePlanSummarizer summarizer;
- private final SharedPlanCopyRepository copies;
- private static final Map<String,String> COUNTRIES=new TreeMap<>(),CODES=new HashMap<>();
- static {
-  for(String code:Locale.getISOCountries()) {String name=Locale.of("",code).getDisplayCountry(Locale.ENGLISH);COUNTRIES.put(code,name);CODES.put(normal(name),code);CODES.put(normal(code),code);}
-  for(String alias:List.of("usa","u s","u s a","united states of america"))CODES.put(alias,"US");
-  for(String alias:List.of("uk","u k","great britain","britain"))CODES.put(alias,"GB");
-  CODES.put("turkiye","TR");CODES.put("south korea","KR");CODES.put("north korea","KP");
- }
- public record Destination(String id,String label,String country,String kind,long count) {}
- public record SearchPage(List<ExplorePlanSummary> content,List<ExplorePlanSummary> recommendations,List<Destination> destinations,
-  List<ExplorePlanSummary> plans,int number,boolean last,long totalElements,long matchedCount) {}
- private record Candidate(TripPublication row,PublicPlanSnapshot plan,int score) {}
- public static String normal(String value){return Normalizer.normalize(value==null?"":value,Normalizer.Form.NFD).replaceAll("\\p{M}+","").toLowerCase(Locale.ROOT).replaceAll("[^\\p{L}\\p{N}]+"," ").trim().replaceAll(" +"," ");}
- private static String code(String value){return CODES.getOrDefault(normal(value),"");}
- private static String canonical(String value){String c=code(value);return c.isEmpty()?normal(value):normal(COUNTRIES.get(c));}
- private static <T> List<T> safe(List<T> values){return values==null?List.of():values;}
- public SearchPage search(String term,String country,Integer days,int page,int size,String sort){
-  term=term==null?"":term.strip();country=country==null?"":country.toUpperCase(Locale.ROOT);
-  if(term.length()>100||(!country.isEmpty()&&!COUNTRIES.containsKey(country))||days!=null&&(days<1||days>36500)||page<0||page>500||size<1||size>48||!Set.of("relevance","recent","trending").contains(sort))throw new IllegalArgumentException("Invalid search parameters");
-  final String query=canonical(term),selected=country;
-  final String[] tokens=query.isBlank()?new String[0]:query.split(" ");
-  Comparator<Candidate> order=Comparator.comparingInt((Candidate c)->"relevance".equals(sort)?c.score():0).reversed();
-  if("trending".equals(sort))order=order.thenComparing(Comparator.comparingLong((Candidate c)->Optional.ofNullable(c.row().getViewCount()).orElse(0L)).reversed());
-  order=order.thenComparing(c->c.row().getListedAt(),Comparator.nullsLast(Comparator.reverseOrder())).thenComparing(c->c.row().getToken());
-  int capacity=page*size+size+6;PriorityQueue<Candidate> top=new PriorityQueue<>(order.reversed());
-  Map<String,Destination> locations=new HashMap<>();long matched=0;
-  try(Stream<TripPublication> stream=repository.streamListed(PlanPublicationSanitizer.SANITIZER_VERSION)){
-   var it=stream.iterator();while(it.hasNext()){
-    TripPublication row=it.next();if(!row.isListed()||row.getSanitizerVersion()==null||row.getSanitizerVersion()<PlanPublicationSanitizer.SANITIZER_VERSION)continue;
-    PublicPlanSnapshot plan;try{plan=mapper.readValue(row.getSnapshot(),PublicPlanSnapshot.class);}catch(Exception unreadable){continue;}
-    if(plan==null||plan.sanitizerVersion()<PlanPublicationSanitizer.SANITIZER_VERSION)continue;
-    Set<String> countries=new HashSet<>();String primary=code(plan.destinationCountry());if(!primary.isEmpty())countries.add(primary);
-    StringBuilder text=new StringBuilder().append(normal(plan.title())).append(' ').append(normal(plan.destinationCity())).append(' ').append(canonical(plan.destinationCountry()));
-    for(PublicDayDto day:Stream.concat(safe(plan.days()).stream(),safe(plan.lists()).stream()).toList()){
-     if(day==null)continue;for(PublicItemDto item:safe(day.items())){
-      if(item==null||!Set.of("place","charger","section").contains(item.type()==null?"":item.type()))continue;
-      text.append(' ').append(normal(item.name())).append(' ').append(normal(item.city()));
-      if(item.address()!=null){text.append(' ').append(normal(item.address()));String[] parts=item.address().split(",");String c=parts.length==0?"":code(parts[parts.length-1]);if(!c.isEmpty())countries.add(c);}
-     }
+    private final ExploreSearchRepository repository;
+    private final ObjectMapper mapper;
+    private final ExplorePlanSummarizer summarizer;
+    private final SharedPlanCopyRepository copies;
+    private static final Map<String,String> COUNTRIES=new TreeMap<>(),CODES=new HashMap<>();
+    static {
+        for(String code:Locale.getISOCountries()) {String name=Locale.of("",code).getDisplayCountry(Locale.ENGLISH);COUNTRIES.put(code,name);CODES.put(normal(name),code);CODES.put(normal(code),code);}
+        for(String alias:List.of("usa","u s","u s a","united states of america"))CODES.put(alias,"US");
+        for(String alias:List.of("uk","u k","great britain","britain"))CODES.put(alias,"GB");
+        CODES.put("turkiye","TR");CODES.put("south korea","KR");CODES.put("north korea","KP");
     }
-    if(!selected.isEmpty()&&!countries.contains(selected)||days!=null&&plan.dayCount()!=days)continue;
-    String all=text.toString();boolean matches=true;for(String token:tokens)if(!all.contains(token)){matches=false;break;}if(!matches)continue;
-    matched++;String title=normal(plan.title()),city=normal(plan.destinationCity());
-    int score=tokens.length==0?0:title.equals(query)?140:canonical(plan.destinationCountry()).equals(query)||city.equals(query)?120:title.startsWith(query)?100:title.contains(query)?85:city.startsWith(query)?80:40;
-    Candidate candidate=new Candidate(row,plan,score);if(top.size()<capacity)top.add(candidate);else if(order.compare(candidate,top.peek())<0){top.poll();top.add(candidate);}
-    if(query.length()>=2&&city.contains(query)&&plan.destinationCity()!=null){String id="city:"+city+":"+primary;Destination old=locations.get(id);locations.put(id,new Destination(id,plan.destinationCity(),primary,"city",old==null?1:old.count()+1));}
-    for(String c:countries){String name=COUNTRIES.get(c);if(query.length()>=2&&normal(name).contains(query)){String id="country:"+c;Destination old=locations.get(id);locations.put(id,new Destination(id,name,c,"country",old==null?1:old.count()+1));}}
-   }
-  }
-  List<Candidate> ranked=top.stream().sorted(order).toList();int recommended=0;
-  if(!query.isBlank()&&"relevance".equals(sort))while(recommended<Math.min(6,ranked.size())&&ranked.get(recommended).score()>=80)recommended++;
-  int from=Math.min(ranked.size(),recommended+page*size),to=Math.min(ranked.size(),from+size);
-  var counts=ranked.isEmpty()?Map.<UUID,SharedPlanCopyRepository.CopyStats>of():copies.counts(ranked.stream().map(c->c.row().getId()).filter(Objects::nonNull).toList());
-  List<ExplorePlanSummary> summaries=ranked.stream().map(c->summarizer.summarize(c.row().getToken(),c.plan(),c.row().getAuthorDisplayName(),c.row().getListedAt(),c.row().getUpdatedAt(),Optional.ofNullable(c.row().getViewCount()).orElse(0L),counts.getOrDefault(c.row().getId(),SharedPlanCopyRepository.CopyStats.ZERO).copies())).toList();
-  if(query.length()>=2)COUNTRIES.forEach((c,name)->{if((selected.isEmpty()||selected.equals(c))&&normal(name).startsWith(query))locations.putIfAbsent("country:"+c,new Destination("country:"+c,name,c,"country",0));});
-  var destinations=locations.values().stream().sorted(Comparator.comparingLong(Destination::count).reversed().thenComparing(Destination::label)).limit(4).toList();long remaining=matched-recommended;
-  return new SearchPage(List.copyOf(summaries.subList(from,to)),page==0?List.copyOf(summaries.subList(0,recommended)):List.of(),destinations,query.length()>=2?List.copyOf(summaries.subList(0,Math.min(4,summaries.size()))):List.of(),page,(long)(page+1)*size>=remaining,remaining,matched);
- }
+    public record Destination(String id,String label,String country,String kind,long count) {}
+    /** Legacy fields remain during rolling upgrades; new clients use matching/related pools. */
+    public record SearchPage(List<ExplorePlanSummary> content,List<ExplorePlanSummary> recommendations,List<Destination> destinations,
+        List<ExplorePlanSummary> plans,int number,boolean last,long totalElements,long matchedCount,
+        List<ExplorePlanSummary> matching,List<ExplorePlanSummary> related,long matchingTotal,long relatedTotal,
+        boolean matchingLast,boolean relatedLast,List<ExplorePlanSummary> relatedPlans,Map<String,String> reasons,String correction) {
+        public SearchPage(List<ExplorePlanSummary> content,List<ExplorePlanSummary> recommendations,List<Destination> destinations,List<ExplorePlanSummary> plans,int number,boolean last,long totalElements,long matchedCount){
+            this(content,recommendations,destinations,plans,number,last,totalElements,matchedCount,Stream.concat(recommendations.stream(),content.stream()).toList(),List.of(),matchedCount,0,last,true,List.of(),Map.of(),null);
+        }
+    }
+    private record Candidate(TripPublication row,PublicPlanSnapshot plan,PlanSearchQuery.Match match) {}
+    public static String normal(String value){return Normalizer.normalize(value==null?"":value,Normalizer.Form.NFD).replaceAll("\\p{M}+","").toLowerCase(Locale.ROOT).replaceAll("[^\\p{L}\\p{N}]+"," ").trim().replaceAll(" +"," ");}
+    private static String code(String value){return CODES.getOrDefault(normal(value),"");}
+    private static <T> List<T> safe(List<T> values){return values==null?List.of():values;}
+    private PublicPlanSnapshot read(TripPublication row) {
+        if(!row.isListed()||row.getStatus()!=TripPublication.PublicationStatus.ACTIVE||row.getToken()==null||row.getSanitizerVersion()==null||row.getSanitizerVersion()<PlanPublicationSanitizer.SANITIZER_VERSION)return null;
+        try {var plan=mapper.readValue(row.getSnapshot(),PublicPlanSnapshot.class);return plan!=null&&plan.sanitizerVersion()>=PlanPublicationSanitizer.SANITIZER_VERSION?plan:null;}catch(Exception unreadable){return null;}
+    }
+    private static List<PublicItemDto> places(PublicPlanSnapshot plan) {
+        return Stream.concat(safe(plan.days()).stream(),safe(plan.lists()).stream()).filter(Objects::nonNull)
+            .flatMap(day->safe(day.items()).stream()).filter(Objects::nonNull)
+            .filter(item->Set.of("place","charger","section").contains(item.type()==null?"":item.type())).toList();
+    }
+    private static PlanSearchQuery.Evidence evidence(PublicPlanSnapshot plan) {
+        Set<String> countries=new HashSet<>();String primary=code(plan.destinationCountry());if(!primary.isEmpty())countries.add(primary);
+        var text=new StringBuilder().append(Objects.toString(plan.title(),"")).append(' ').append(Objects.toString(plan.destinationCity(),"")).append(' ').append(Objects.toString(plan.destinationCountry(),""));
+        var themeText=new StringBuilder().append(Objects.toString(plan.title(),""));
+        for(var item:places(plan)) {
+            text.append(' ').append(Objects.toString(item.name(),"")).append(' ').append(Objects.toString(item.city(),""))
+                .append(' ').append(Objects.toString(item.description(),"")).append(' ').append(Objects.toString(item.placeType(),"").replace('_',' '));
+            themeText.append(' ').append(Objects.toString(item.name(),"")).append(' ').append(Objects.toString(item.placeType(),"").replace('_',' '));
+            if(item.charger()!=null){text.append(" ev charger");themeText.append(" ev charger");}
+            if(item.arrivalMode()!=null){text.append(' ').append(item.arrivalMode());themeText.append(' ').append(item.arrivalMode());}
+            if(item.address()!=null){text.append(' ').append(item.address());String[] parts=item.address().split(",");String c=parts.length==0?"":code(parts[parts.length-1]);if(!c.isEmpty())countries.add(c);}
+        }
+        if(countries.contains("US")&&PlanSearchQuery.phrase(text.toString(),"ca"))text.append(" California");
+        String normalized=normal(text.toString());
+        return new PlanSearchQuery.Evidence(plan.title(),normalized,Set.copyOf(countries),PlanSearchQuery.themesIn(themeText.toString()));
+    }
+    private static void retain(PriorityQueue<Candidate> pool,Candidate value,int capacity,Comparator<Candidate> order){
+        if(pool.size()<capacity)pool.add(value);else if(order.compare(value,pool.peek())<0){pool.poll();pool.add(value);}
+    }
+    private static <T> List<T> window(List<T> values,int from,int size){int start=Math.min(values.size(),from);return List.copyOf(values.subList(start,Math.min(values.size(),start+size)));}
+    public SearchPage search(String term,String country,Integer days,int page,int size,String sort){
+        term=term==null?"":term.strip();country=country==null?"":country.toUpperCase(Locale.ROOT);
+        if(term.length()>100||(!country.isEmpty()&&!COUNTRIES.containsKey(country))||days!=null&&(days<1||days>36500)||page<0||page>500||size<1||size>48||!Set.of("relevance","recent","trending").contains(sort))throw new IllegalArgumentException("Invalid search parameters");
+        final String text=term,selected=country,normalized=normal(term);
+        var locations=new LinkedHashMap<String,PlanSearchQuery.Location>();
+        COUNTRIES.forEach((c,name)->locations.put("country:"+c,new PlanSearchQuery.Location(name,c,true)));
+        CODES.forEach((alias,c)->{if(alias.length()>2||Set.of("uk","us").contains(alias)||normalized.equals(alias))locations.putIfAbsent("alias:"+alias,new PlanSearchQuery.Location(alias,c,true));});
+        locations.put("region:california",new PlanSearchQuery.Location("California","US",false));
+        locations.put("alias:hua-hin",new PlanSearchQuery.Location("Hua Hin","TH",false));
+        // Only query-related public city names are retained; exact mentions cannot be displaced by prefix candidates.
+        var cities=new LinkedHashMap<String,PlanSearchQuery.Location>();
+        try(Stream<TripPublication> stream=repository.streamListed(PlanPublicationSanitizer.SANITIZER_VERSION)) {
+            stream.forEach(row->{var plan=read(row);if(plan==null)return;String c=code(plan.destinationCountry());
+                var names=new ArrayList<String>();names.add(plan.destinationCity());places(plan).forEach(item->names.add(item.city()));
+                for(String name:names)if(name!=null&&!name.isBlank()&&!c.isEmpty()) {
+                    boolean exact=!normalized.isBlank()&&PlanSearchQuery.compact(text).contains(PlanSearchQuery.compact(name));
+                    if(exact||cities.size()<128&&PlanSearchQuery.completesLocation(text,name))cities.putIfAbsent(normal(name)+":"+c,new PlanSearchQuery.Location(name,c,false));
+                }
+            });
+        }
+        locations.putAll(cities);var query=PlanSearchQuery.parse(text,locations.values(),selected);
+        Comparator<Candidate> order=Comparator.comparingInt((Candidate c)->"relevance".equals(sort)?c.match().score():0).reversed();
+        if("trending".equals(sort))order=order.thenComparing(Comparator.comparingLong((Candidate c)->Optional.ofNullable(c.row().getViewCount()).orElse(0L)).reversed());
+        order=order.thenComparing(c->c.row().getListedAt(),Comparator.nullsLast(Comparator.reverseOrder())).thenComparing(c->c.row().getToken());
+        int capacity=page*size+size+6;var strong=new PriorityQueue<Candidate>(order.reversed());var related=new PriorityQueue<Candidate>(order.reversed());
+        var suggestionLocations=locations.values().stream().filter(location->{
+            if(location.name().length()<3||!selected.isEmpty()&&!selected.equals(location.country()))return false;
+            String name=normal(location.name());return normalized.length()>=2&&(name.startsWith(normalized)||PlanSearchQuery.completesLocation(text,name)||query.geography.stream().anyMatch(g->normal(g.name()).equals(name)));
+        }).toList();
+        var destinations=new HashMap<String,Destination>();long matchingTotal=0,relatedTotal=0;
+        try(Stream<TripPublication> stream=repository.streamListed(PlanPublicationSanitizer.SANITIZER_VERSION)) {
+            var iterator=stream.iterator();while(iterator.hasNext()) {
+                var row=iterator.next();var plan=read(row);if(plan==null)continue;var facts=evidence(plan);
+                if(!selected.isEmpty()&&!facts.countries().contains(selected)||days!=null&&plan.dayCount()!=days)continue;
+                // Destination completions are independent of strong/related result eligibility.
+                var seenDestinations=new HashSet<String>();
+                for(var location:suggestionLocations) {
+                    String name=normal(location.name());
+                    boolean occurs=location.countryLevel()?facts.countries().contains(location.country()):PlanSearchQuery.phrase(facts.text(),name);
+                    if(!occurs)continue;
+                    String id=location.countryLevel()?"country:"+location.country():"city:"+name+":"+location.country();
+                    if(!seenDestinations.add(id))continue;
+                    Destination old=destinations.get(id);String label=location.countryLevel()?COUNTRIES.get(location.country()):location.name();
+                    // Country aliases must not multiply the same plan count.
+                    destinations.put(id,new Destination(id,label,location.country(),location.countryLevel()?"country":"city",old==null?1:old.count()+1));
+                }
+                var match=query.match(facts,COUNTRIES);if(match==null)continue;
+                var value=new Candidate(row,plan,match);
+                if(match.strong()){matchingTotal++;retain(strong,value,capacity,order);}else{relatedTotal++;retain(related,value,capacity,order);}
+            }
+        }
+        var ranked=strong.stream().sorted(order).toList();var broader=related.stream().sorted(order).toList();
+        var retained=Stream.concat(ranked.stream(),broader.stream()).toList();
+        var counts=retained.isEmpty()?Map.<UUID,SharedPlanCopyRepository.CopyStats>of():copies.counts(retained.stream().map(c->c.row().getId()).toList());
+        Function<Candidate,ExplorePlanSummary> summary=c->summarizer.summarize(c.row().getToken(),c.plan(),c.row().getAuthorDisplayName(),c.row().getListedAt(),c.row().getUpdatedAt(),Optional.ofNullable(c.row().getViewCount()).orElse(0L),counts.getOrDefault(c.row().getId(),SharedPlanCopyRepository.CopyStats.ZERO).copies());
+        int recommended=!normalized.isBlank()&&"relevance".equals(sort)?Math.min(6,ranked.size()):0;
+        var matching=window(ranked,page*size,size).stream().map(summary).toList();var relatedPage=window(broader,page*size,size).stream().map(summary).toList();
+        var suggestions=normalized.length()>=2?window(ranked,0,4).stream().map(summary).toList():List.<ExplorePlanSummary>of();
+        var relatedSuggestions=normalized.length()>=2?window(broader,0,4).stream().map(summary).toList():List.<ExplorePlanSummary>of();
+        var reasons=new LinkedHashMap<String,String>();Stream.concat(window(broader,page*size,size).stream(),window(broader,0,4).stream()).forEach(c->reasons.put(c.row().getToken(),c.match().reason()));
+        var destinationList=destinations.values().stream().sorted(Comparator.comparingLong(Destination::count).reversed().thenComparing(Destination::label).thenComparing(Destination::id)).limit(6).toList();
+        boolean matchingLast=(long)(page+1)*size>=matchingTotal,relatedLast=(long)(page+1)*size>=relatedTotal;
+        return new SearchPage(window(ranked,recommended+page*size,size).stream().map(summary).toList(),page==0?window(ranked,0,recommended).stream().map(summary).toList():List.of(),destinationList,suggestions,page,(long)(page+1)*size>=matchingTotal-recommended,matchingTotal-recommended,matchingTotal,
+            matching,relatedPage,matchingTotal,relatedTotal,matchingLast,relatedLast,relatedSuggestions,Map.copyOf(reasons),query.correction);
+    }
 }
