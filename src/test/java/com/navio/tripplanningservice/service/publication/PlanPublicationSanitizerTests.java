@@ -65,6 +65,17 @@ class PlanPublicationSanitizerTests {
         assertThat(tree.toString()).doesNotContain("Never share this", "private-list");
     }
 
+    @Test
+    void generatedDateTitleFollowsDatePrivacyAndDoesNotMutatePrivateBlock() throws Exception {
+        var date=LocalDate.of(2032,2,29);
+        var block=new PlannerBlockDto("leap","itinerary",date.toString(),date,"teal",List.of());
+        var hidden=sanitizeSnapshot(PublicationOptions.none(),block);
+        assertThat(toJson(hidden)).doesNotContain("2032","02-29");
+        var shown=sanitizeSnapshot(new PublicationOptions(true,false,false),block);
+        assertThat(toJson(shown)).contains("02-29").doesNotContain("2032");
+        assertThat(block.date()).isEqualTo(date);assertThat(block.title()).isEqualTo("2032-02-29");
+    }
+
     // ---------------------------------------------------------------- anchors
 
     @Test

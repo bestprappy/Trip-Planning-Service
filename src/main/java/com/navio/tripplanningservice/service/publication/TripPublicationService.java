@@ -259,7 +259,7 @@ public class TripPublicationService {
         List<ExplorePlanSummary> summaries = new ArrayList<>(rows.getNumberOfElements());
         for (TripPublication row : rows.getContent()) {
             try {
-                PublicPlanSnapshot plan = objectMapper.readValue(row.getSnapshot(), PublicPlanSnapshot.class);
+                PublicPlanSnapshot plan = PublicPlanDates.read(objectMapper,row.getSnapshot());
                 summaries.add(summarizer.summarize(
                         row.getToken(), plan, row.getAuthorDisplayName(), row.getListedAt(), row.getUpdatedAt(),
                         row.getViewCount() == null ? 0 : row.getViewCount(),
@@ -293,11 +293,11 @@ public class TripPublicationService {
                 .findFirst().orElse(null);
         String destination = publicPlan.destinationCity() == null || publicPlan.destinationCity().isBlank()
                 ? "Shared trip" : publicPlan.destinationCity();
-        LocalDate originalStart=publicPlan.startDate()!=null?publicPlan.startDate():publicDays.stream().map(com.navio.tripplanningservice.dto.publication.PublicDayDto::date).filter(Objects::nonNull).min(LocalDate::compareTo).orElse(null);
-        if(request!=null&&!java.util.Set.of("retain","change").contains(Objects.requireNonNullElse(request.dateMode(),"")))throw new com.navio.tripplanningservice.service.PlannerService.PlannerValidationException("Choose whether to retain or change trip dates");
-        if(request!=null&&"retain".equals(request.dateMode())&&originalStart==null)throw new com.navio.tripplanningservice.service.PlannerService.PlannerValidationException("This plan has no shared dates; choose a start date");
-        LocalDate start=request==null?LocalDate.now():"retain".equals(request.dateMode())?originalStart:request.startDate();
-        if(start==null)throw new com.navio.tripplanningservice.service.PlannerService.PlannerValidationException("Choose a start date");
+        java.time.MonthDay originalStart=publicPlan.startDate()!=null?publicPlan.startDate():publicDays.stream().map(com.navio.tripplanningservice.dto.publication.PublicDayDto::date).filter(Objects::nonNull).findFirst().orElse(null);
+        if(request!=null&&!java.util.Set.of("retain","change").contains(Objects.requireNonNullElse(request.dateMode(),"")))throw new com.navio.tripplanningservice.service.PlannerService.PlannerValidationException("Choose trip dates");
+        LocalDate start=request==null?null:request.startDate();
+        if(start==null)throw new com.navio.tripplanningservice.service.PlannerService.PlannerValidationException("Choose a start date and year; published dates have no year");
+        if(request!=null&&"retain".equals(request.dateMode())&&(originalStart==null||!originalStart.equals(java.time.MonthDay.from(start))))throw new com.navio.tripplanningservice.service.PlannerService.PlannerValidationException("Choose a valid year for the published month and day, or choose new dates");
         int dayCount = Math.max(1, publicPlan.dayCount());
         Trip copy = Trip.builder()
                 .userId(userId)
@@ -312,12 +312,8 @@ public class TripPublicationService {
                 .destinationCountry(publicPlan.destinationCountry())
                 .visibility(com.navio.tripplanningservice.model.TripVisibility.PRIVATE)
                 .build();
-        long span=originalStart==null?dayCount-1:publicDays.stream().filter(d->d.date()!=null).mapToLong(d->java.time.temporal.ChronoUnit.DAYS.between(originalStart,d.date())).max().orElse(dayCount-1);
-        if(originalStart!=null&&publicPlan.endDate()!=null){
-            long declaredSpan=java.time.temporal.ChronoUnit.DAYS.between(originalStart,publicPlan.endDate());
-            if(declaredSpan<0)throw new com.navio.tripplanningservice.service.PlannerService.PlannerValidationException("Invalid published date range");
-            span=Math.max(span,declaredSpan);
-        }
+        long span=publicPlan.daySpan()==null?dayCount-1:publicPlan.daySpan();
+        span=Math.max(span,publicDays.stream().filter(d->d.dayOffset()!=null).mapToLong(d->d.dayOffset()).max().orElse(dayCount-1));
         if(span<0||span>3660)throw new com.navio.tripplanningservice.service.PlannerService.PlannerValidationException("Invalid published date range");
         copy.setEndDate(start.plusDays(Math.max(span,dayCount-1)));
         copy = tripRepository.saveAndFlush(copy);
@@ -336,7 +332,7 @@ public class TripPublicationService {
         }
         int dayIndex = 0;
         for (var publicDay : publicDays) {
-            LocalDate day = start.plusDays(originalStart!=null&&publicDay.date()!=null?java.time.temporal.ChronoUnit.DAYS.between(originalStart,publicDay.date()):dayIndex);
+            LocalDate day = start.plusDays(publicDay.dayOffset()!=null?publicDay.dayOffset():dayIndex);
             List<PlannerItemDto> items = new ArrayList<>();
             for (PublicItemDto item : publicDay.items() == null ? List.<PublicItemDto>of() : publicDay.items()) {
                 PlannerItemDto copied = copyPublishedItem(item);
@@ -464,7 +460,7 @@ public class TripPublicationService {
 
     private PublicPlanSnapshot deserialize(TripPublication publication) {
         try {
-            return objectMapper.readValue(publication.getSnapshot(), PublicPlanSnapshot.class);
+            return PublicPlanDates.read(objectMapper,publication.getSnapshot());
         } catch (com.fasterxml.jackson.core.JsonProcessingException exception) {
             // Do not fall back to re-projecting from the live trip: that would
             // silently publish current content under a link the owner froze.

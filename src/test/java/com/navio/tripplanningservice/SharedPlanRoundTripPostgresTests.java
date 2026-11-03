@@ -38,15 +38,18 @@ class SharedPlanRoundTripPostgresTests {
    var publication=json.createObjectNode().put("expectedTripVersion",saved.path("version").asLong()).put("listInExplore",true).put("authorDisplayName","Navio review example").put("title",sample.path("label").asText());publication.set("options",sample.path("source").path("options"));
    var published=request("PUT","/v1/trips/"+id+"/publication",owner,publication,200);String token=published.path("token").asText();
    var publicPlan=request("GET","/v1/shared-plans/"+token,null,null,200).path("plan");
+   assertThat(publicPlan.path("startDate").asText()).isEqualTo(plan.path("startDate").asText().substring(5));
    assertThat(publicPlan.path("startingPart").path("content").asText()).isEqualTo(plan.path("startingPart").path("content").asText());
    assertThat(publicPlan.path("lists").size()).isEqualTo(plan.path("lists").size());
    assertThat(publicPlan.path("garage").size()).isEqualTo(plan.path("garage").size());
    for(var originalVehicle:sample.path("source").path("energyState").path("vehicles"))assertThat(publicPlan.toString()).doesNotContain(originalVehicle.path("vehicle").path("id").asText());
+   request("POST","/v1/shared-plans/"+token+"/copies",copier,null,400);
    for(String mode:new String[]{"retain","change"}){
-    var choice=json.createObjectNode().put("dateMode",mode).put("startDate","2030-01-01");
+    String chosen="retain".equals(mode)?"2032-"+plan.path("startDate").asText().substring(5):"2030-01-01";
+    var choice=json.createObjectNode().put("dateMode",mode).put("startDate",chosen);
     var copied=request("POST","/v1/shared-plans/"+token+"/copies",copier,choice,201);
     var reload=request("GET","/v1/trips/"+copied.path("id").asText()+"/planner",copier,null,200);
-    assertThat(copied.path("startDate").asText()).isEqualTo("retain".equals(mode)?plan.path("startDate").asText():"2030-01-01");
+    assertThat(copied.path("startDate").asText()).isEqualTo(chosen);
     assertThat(reload.path("blocks").size()).isEqualTo(source.path("blocks").size());
     assertThat(reload.path("blocks").get(0).path("id").asText()).startsWith("starting-part-");
     assertThat(reload.path("blocks").get(0).path("items").get(0).path("content").asText()).isEqualTo(plan.path("startingPart").path("content").asText());

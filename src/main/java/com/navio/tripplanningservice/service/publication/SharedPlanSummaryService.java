@@ -71,7 +71,7 @@ public class SharedPlanSummaryService {
     private PublicPlanSnapshot snapshot(TripPublication publication) {
         PublicPlanSnapshot snapshot;
         try {
-            snapshot = objectMapper.readValue(publication.getSnapshot(), PublicPlanSnapshot.class);
+            snapshot = PublicPlanDates.read(objectMapper,publication.getSnapshot());
         } catch (JsonProcessingException exception) {
             log.error("Stored snapshot for publication {} is unreadable", publication.getId(), exception);
             throw new SharedPlanUnavailableException();

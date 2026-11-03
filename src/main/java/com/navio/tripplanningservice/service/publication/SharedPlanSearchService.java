@@ -27,14 +27,15 @@ public class SharedPlanSearchService {
         for(String alias:List.of("uk","u k","great britain","britain"))CODES.put(alias,"GB");
         CODES.put("turkiye","TR");CODES.put("south korea","KR");CODES.put("north korea","KP");
     }
+    public record QuerySuggestion(String text,String source) {}
     public record Destination(String id,String label,String country,String kind,long count) {}
     /** Legacy fields remain during rolling upgrades; new clients use matching/related pools. */
     public record SearchPage(List<ExplorePlanSummary> content,List<ExplorePlanSummary> recommendations,List<Destination> destinations,
         List<ExplorePlanSummary> plans,int number,boolean last,long totalElements,long matchedCount,
         List<ExplorePlanSummary> matching,List<ExplorePlanSummary> related,long matchingTotal,long relatedTotal,
-        boolean matchingLast,boolean relatedLast,List<ExplorePlanSummary> relatedPlans,Map<String,String> reasons,String correction) {
+        boolean matchingLast,boolean relatedLast,List<ExplorePlanSummary> relatedPlans,Map<String,String> reasons,String correction,List<QuerySuggestion> querySuggestions,String notice) {
         public SearchPage(List<ExplorePlanSummary> content,List<ExplorePlanSummary> recommendations,List<Destination> destinations,List<ExplorePlanSummary> plans,int number,boolean last,long totalElements,long matchedCount){
-            this(content,recommendations,destinations,plans,number,last,totalElements,matchedCount,Stream.concat(recommendations.stream(),content.stream()).toList(),List.of(),matchedCount,0,last,true,List.of(),Map.of(),null);
+            this(content,recommendations,destinations,plans,number,last,totalElements,matchedCount,Stream.concat(recommendations.stream(),content.stream()).toList(),List.of(),matchedCount,0,last,true,List.of(),Map.of(),null,List.of(),null);
         }
     }
     private record Candidate(TripPublication row,PublicPlanSnapshot plan,PlanSearchQuery.Match match) {}
@@ -43,7 +44,7 @@ public class SharedPlanSearchService {
     private static <T> List<T> safe(List<T> values){return values==null?List.of():values;}
     private PublicPlanSnapshot read(TripPublication row) {
         if(!row.isListed()||row.getStatus()!=TripPublication.PublicationStatus.ACTIVE||row.getToken()==null||row.getSanitizerVersion()==null||row.getSanitizerVersion()<PlanPublicationSanitizer.SANITIZER_VERSION)return null;
-        try {var plan=mapper.readValue(row.getSnapshot(),PublicPlanSnapshot.class);return plan!=null&&plan.sanitizerVersion()>=PlanPublicationSanitizer.SANITIZER_VERSION?plan:null;}catch(Exception unreadable){return null;}
+        try {var plan=PublicPlanDates.read(mapper,row.getSnapshot());return plan!=null&&plan.sanitizerVersion()>=PlanPublicationSanitizer.SANITIZER_VERSION?plan:null;}catch(Exception unreadable){return null;}
     }
     private static List<PublicItemDto> places(PublicPlanSnapshot plan) {
         return Stream.concat(safe(plan.days()).stream(),safe(plan.lists()).stream()).filter(Objects::nonNull)
@@ -63,8 +64,25 @@ public class SharedPlanSearchService {
             if(item.address()!=null){text.append(' ').append(item.address());String[] parts=item.address().split(",");String c=parts.length==0?"":code(parts[parts.length-1]);if(!c.isEmpty())countries.add(c);}
         }
         if(countries.contains("US")&&PlanSearchQuery.phrase(text.toString(),"ca"))text.append(" California");
+        // Only already-sanitized public owner text participates; private planner state is never read.
+        if(plan.startingPart()!=null)appendOwnerText(text,themeText,plan.startingPart().content());
+        Stream.concat(safe(plan.days()).stream(),safe(plan.lists()).stream()).filter(Objects::nonNull).forEach(day->{
+            text.append(' ').append(Objects.toString(day.title(),""));
+            for(var item:safe(day.items()))if(item!=null){appendOwnerText(text,themeText,item.notes());appendOwnerText(text,themeText,item.noteContent());}
+        });
         String normalized=normal(text.toString());
-        return new PlanSearchQuery.Evidence(plan.title(),normalized,Set.copyOf(countries),PlanSearchQuery.themesIn(themeText.toString()));
+        var dates=new ArrayList<java.time.MonthDay>();
+        if(plan.included()!=null&&plan.included().includeDates()) {
+            if(plan.startDate()!=null)dates.add(plan.startDate());
+            safe(plan.days()).stream().filter(Objects::nonNull).map(PublicDayDto::date).filter(Objects::nonNull).forEach(dates::add);
+        }
+        return new PlanSearchQuery.Evidence(plan.title(),normalized,Set.copyOf(countries),PlanSearchQuery.themesIn(themeText.toString()),List.copyOf(dates));
+    }
+    private static void appendOwnerText(StringBuilder text,StringBuilder themes,String value) {
+        if(value==null)return;
+        // Speculative/negative owner sentences are not affirmative activity evidence.
+        String positive=Arrays.stream(value.split("(?<=[.!?;])|\\n")).filter(sentence->!sentence.contains("?")&&!normal(sentence).matches(".*\\b(?:no|not|without|avoid|maybe|might|perhaps|optional|consider|could|should)\\b.*")).collect(java.util.stream.Collectors.joining(" "));
+        text.append(' ').append(positive);themes.append(' ').append(positive);
     }
     private static void retain(PriorityQueue<Candidate> pool,Candidate value,int capacity,Comparator<Candidate> order){
         if(pool.size()<capacity)pool.add(value);else if(order.compare(value,pool.peek())<0){pool.poll();pool.add(value);}
@@ -99,6 +117,7 @@ public class SharedPlanSearchService {
             if(location.name().length()<3||!selected.isEmpty()&&!selected.equals(location.country()))return false;
             String name=normal(location.name());return normalized.length()>=2&&(name.startsWith(normalized)||PlanSearchQuery.completesLocation(text,name)||query.geography.stream().anyMatch(g->normal(g.name()).equals(name)));
         }).toList();
+        var phraseCandidates=new TreeSet<String>();
         var destinations=new HashMap<String,Destination>();long matchingTotal=0,relatedTotal=0;
         try(Stream<TripPublication> stream=repository.streamListed(PlanPublicationSanitizer.SANITIZER_VERSION)) {
             var iterator=stream.iterator();while(iterator.hasNext()) {
@@ -117,6 +136,12 @@ public class SharedPlanSearchService {
                     destinations.put(id,new Destination(id,label,location.country(),location.countryLevel()?"country":"city",old==null?1:old.count()+1));
                 }
                 var match=query.match(facts,COUNTRIES);if(match==null)continue;
+                if(phraseCandidates.size()<128 && match.strong() && plan.title()!=null && !normalized.isBlank()) {
+                    String geography=query.geography.stream().map(g->g.countryLevel()?COUNTRIES.getOrDefault(g.country(),g.name()):g.name()).distinct().filter(name->!PlanSearchQuery.phrase(plan.title(),name)).collect(java.util.stream.Collectors.joining(" "));
+                    String phrase=(geography+" "+plan.title()).strip();
+                    var phraseMatch=query.match(new PlanSearchQuery.Evidence(phrase,normal(phrase),facts.countries(),PlanSearchQuery.themesIn(phrase)),COUNTRIES);
+                    if(phraseMatch!=null&&phraseMatch.strong()&&!normal(phrase).equals(normalized))phraseCandidates.add(phrase);
+                }
                 var value=new Candidate(row,plan,match);
                 if(match.strong()){matchingTotal++;retain(strong,value,capacity,order);}else{relatedTotal++;retain(related,value,capacity,order);}
             }
@@ -133,6 +158,6 @@ public class SharedPlanSearchService {
         var destinationList=destinations.values().stream().sorted(Comparator.comparingLong(Destination::count).reversed().thenComparing(Destination::label).thenComparing(Destination::id)).limit(6).toList();
         boolean matchingLast=(long)(page+1)*size>=matchingTotal,relatedLast=(long)(page+1)*size>=relatedTotal;
         return new SearchPage(window(ranked,recommended+page*size,size).stream().map(summary).toList(),page==0?window(ranked,0,recommended).stream().map(summary).toList():List.of(),destinationList,suggestions,page,(long)(page+1)*size>=matchingTotal-recommended,matchingTotal-recommended,matchingTotal,
-            matching,relatedPage,matchingTotal,relatedTotal,matchingLast,relatedLast,relatedSuggestions,Map.copyOf(reasons),query.correction);
+            matching,relatedPage,matchingTotal,relatedTotal,matchingLast,relatedLast,relatedSuggestions,Map.copyOf(reasons),query.correction,phraseCandidates.stream().sorted(Comparator.comparingInt((String p)->normal(p).startsWith(normalized)?0:1).thenComparing(String::length).thenComparing(Function.identity())).limit(4).map(p->new QuerySuggestion(p,"catalogue")).toList(),query.temporal.yearRequested()?"Published trip dates show month and day only; a travel year cannot be verified.":null);
     }
 }

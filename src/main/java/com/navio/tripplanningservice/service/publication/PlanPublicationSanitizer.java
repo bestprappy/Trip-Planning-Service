@@ -98,7 +98,7 @@ public class PlanPublicationSanitizer {
                 continue;
             }
             dayNumber++;
-            var publishedDay=sanitizeDay(block, dayNumber, options);
+            var publishedDay=sanitizeDay(block, dayNumber, options, trip.getStartDate());
             days.add(publishedDay);
             collectRefs(block,publishedDay,options,publicRefs);
         }
@@ -114,7 +114,7 @@ public class PlanPublicationSanitizer {
                     if (!content.isBlank()) starting = new com.navio.tripplanningservice.dto.publication.PublicStartingPartDto(safeText(block.title()),content);
                 }
             } else if (options.listIds().contains(block.id())) {
-                var section = sanitizeDay(block,-selectedLists.size()-1,options);
+                var section = sanitizeDay(block,-selectedLists.size()-1,options,null);
                 collectRefs(block,section,options,publicRefs);
                 selectedLists.add(new PublicDayDto("My List",null,safeText(block.title()),section.colorId(),null,null,section.items()));
             }
@@ -140,7 +140,7 @@ public class PlanPublicationSanitizer {
         if (title == null || title.isBlank()) return snapshot;
         return new PublicPlanSnapshot(snapshot.sanitizerVersion(), title,
                 snapshot.destinationCity(), snapshot.destinationCountry(), snapshot.startDate(),
-                snapshot.endDate(), snapshot.dayCount(), snapshot.days(), snapshot.budget(), snapshot.included(), snapshot.startingPart(), snapshot.lists(), snapshot.garage());
+                snapshot.endDate(), snapshot.dayCount(), snapshot.days(), snapshot.budget(), snapshot.included(), snapshot.startingPart(), snapshot.lists(), snapshot.garage(), snapshot.daySpan());
     }
 
     /**
@@ -152,7 +152,7 @@ public class PlanPublicationSanitizer {
         return colorId != null && PALETTE_COLOR_ID.matcher(colorId).matches() ? colorId : null;
     }
 
-    private PublicDayDto sanitizeDay(PlannerBlockDto block, int dayNumber, PublicationOptions options) {
+    private PublicDayDto sanitizeDay(PlannerBlockDto block, int dayNumber, PublicationOptions options, java.time.LocalDate tripStart) {
         List<PublicItemDto> items = new ArrayList<>();
         PlannerItemDto previousStop = null;
         PublicItemDto previousPublic = null;
@@ -183,12 +183,12 @@ public class PlanPublicationSanitizer {
 
         return new PublicDayDto(
                 "Day " + dayNumber,
-                options.includeDates() ? block.date() : null,
-                safeText(block.title()),
+                options.includeDates() && block.date()!=null ? java.time.MonthDay.from(block.date()) : null,
+                block.date()!=null&&block.date().toString().equals(block.title())?(options.includeDates()?java.time.MonthDay.from(block.date()).toString():null):safeText(block.title()),
                 safeColorId(block.colorId()),
                 sanitizeAnchor(block.startAnchor(), true),
                 sanitizeAnchor(block.endAnchor(), false),
-                List.copyOf(items));
+                List.copyOf(items), options.includeDates() && tripStart!=null && block.date()!=null && dayNumber>0 ? Math.toIntExact(java.time.temporal.ChronoUnit.DAYS.between(tripStart,block.date())) : null);
     }
 
     /**

@@ -26,16 +26,23 @@ public record PublicPlanSnapshot(
         String title,
         String destinationCity,
         String destinationCountry,
-        LocalDate startDate,
-        LocalDate endDate,
+        @com.fasterxml.jackson.databind.annotation.JsonDeserialize(using=PublicMonthDayDeserializer.class)
+        @com.fasterxml.jackson.annotation.JsonFormat(pattern="MM-dd") java.time.MonthDay startDate,
+        @com.fasterxml.jackson.databind.annotation.JsonDeserialize(using=PublicMonthDayDeserializer.class)
+        @com.fasterxml.jackson.annotation.JsonFormat(pattern="MM-dd") java.time.MonthDay endDate,
         int dayCount,
         List<PublicDayDto> days,
         PublicBudgetDto budget,
         PublicationOptions included,
         PublicStartingPartDto startingPart,
         List<PublicDayDto> lists,
-        List<com.fasterxml.jackson.databind.JsonNode> garage
+        List<com.fasterxml.jackson.databind.JsonNode> garage,
+        Integer daySpan
 ) {
+    public PublicPlanSnapshot(int version,String title,String city,String country,LocalDate start,LocalDate end,int count,
+        List<PublicDayDto> days,PublicBudgetDto budget,PublicationOptions included,PublicStartingPartDto starting,List<PublicDayDto> lists,List<com.fasterxml.jackson.databind.JsonNode> garage) {
+        this(version,title,city,country,start==null?null:java.time.MonthDay.from(start),end==null?null:java.time.MonthDay.from(end),count,days,budget,included,starting,lists,garage,start==null||end==null?null:Math.toIntExact(java.time.temporal.ChronoUnit.DAYS.between(start,end)));
+    }
     public PublicPlanSnapshot(int version,String title,String city,String country,LocalDate start,LocalDate end,int count,
         List<PublicDayDto> days,PublicBudgetDto budget,PublicationOptions included){
         this(version,title,city,country,start,end,count,days,budget,included,null,null,null);

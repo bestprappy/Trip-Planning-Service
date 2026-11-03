@@ -502,7 +502,7 @@ class TripPublicationServiceTests {
         when(publicationRepository.findByTokenAndStatus("tok-existing", TripPublication.PublicationStatus.ACTIVE))
                 .thenReturn(Optional.of(unlisted));
 
-        assertThatThrownBy(() -> service.copySharedPlan("tok-existing", STRANGER))
+        assertThatThrownBy(() -> service.copySharedPlan("tok-existing", STRANGER,new com.navio.tripplanningservice.dto.publication.CopyPlanRequest("change",java.time.LocalDate.of(2032,3,10))))
                 .isInstanceOf(TripPublicationService.SharedPlanUnavailableException.class);
         verifyNoInteractions(tripRepository, plannerService, tripService);
     }
@@ -520,7 +520,7 @@ class TripPublicationServiceTests {
             return copy;
         });
 
-        service.copySharedPlan("tok-existing", STRANGER);
+        service.copySharedPlan("tok-existing", STRANGER,new com.navio.tripplanningservice.dto.publication.CopyPlanRequest("change",java.time.LocalDate.of(2032,3,10)));
         var order = org.mockito.Mockito.inOrder(plannerService, copyEvents);
         order.verify(plannerService).savePlannerSnapshot(any(), org.mockito.ArgumentMatchers.eq(STRANGER), any());
         order.verify(copyEvents).recordSuccessfulCopy(any(), any(), org.mockito.ArgumentMatchers.eq(STRANGER));
@@ -538,7 +538,7 @@ class TripPublicationServiceTests {
             Trip copy = call.getArgument(0); copy.setId(UUID.randomUUID()); copy.setVersion(0L); return copy;
         });
         when(plannerService.savePlannerSnapshot(any(), any(), any())).thenThrow(new IllegalStateException("save failed"));
-        assertThatThrownBy(() -> service.copySharedPlan("tok-existing", STRANGER)).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> service.copySharedPlan("tok-existing", STRANGER,new com.navio.tripplanningservice.dto.publication.CopyPlanRequest("change",java.time.LocalDate.of(2032,3,10)))).isInstanceOf(IllegalStateException.class);
         verifyNoInteractions(copyEvents);
     }
 
@@ -575,7 +575,7 @@ class TripPublicationServiceTests {
             return copy;
         });
 
-        service.copySharedPlan("tok-existing", STRANGER);
+        service.copySharedPlan("tok-existing", STRANGER,new com.navio.tripplanningservice.dto.publication.CopyPlanRequest("change",java.time.LocalDate.of(2032,3,10)));
 
         ArgumentCaptor<Trip> copiedTrip = ArgumentCaptor.forClass(Trip.class);
         verify(tripRepository).saveAndFlush(copiedTrip.capture());
@@ -613,7 +613,7 @@ class TripPublicationServiceTests {
             return copy;
         });
 
-        service.copySharedPlan("tok-existing", STRANGER);
+        service.copySharedPlan("tok-existing", STRANGER,new com.navio.tripplanningservice.dto.publication.CopyPlanRequest("change",java.time.LocalDate.of(2032,3,10)));
 
         ArgumentCaptor<PlannerSnapshotRequest> copiedPlan = ArgumentCaptor.forClass(PlannerSnapshotRequest.class);
         verify(plannerService).savePlannerSnapshot(any(), org.mockito.ArgumentMatchers.eq(STRANGER), copiedPlan.capture());
@@ -642,7 +642,7 @@ class TripPublicationServiceTests {
             return copy;
         });
 
-        service.copySharedPlan("tok-existing", STRANGER);
+        service.copySharedPlan("tok-existing", STRANGER,new com.navio.tripplanningservice.dto.publication.CopyPlanRequest("change",java.time.LocalDate.of(2032,3,10)));
 
         ArgumentCaptor<PlannerSnapshotRequest> copiedPlan = ArgumentCaptor.forClass(PlannerSnapshotRequest.class);
         verify(plannerService).savePlannerSnapshot(any(), org.mockito.ArgumentMatchers.eq(STRANGER), copiedPlan.capture());
@@ -698,7 +698,7 @@ class TripPublicationServiceTests {
         when(tripRepository.saveAndFlush(any())).thenAnswer(call -> {
             Trip copy=call.getArgument(0);copy.setId(UUID.randomUUID());copy.setVersion(0L);return copy;
         });
-        service.copySharedPlan("tok-existing", STRANGER);
+        service.copySharedPlan("tok-existing", STRANGER,new com.navio.tripplanningservice.dto.publication.CopyPlanRequest("change",java.time.LocalDate.of(2032,3,10)));
         ArgumentCaptor<PlannerSnapshotRequest> request=ArgumentCaptor.forClass(PlannerSnapshotRequest.class);
         verify(plannerService).savePlannerSnapshot(any(), org.mockito.ArgumentMatchers.eq(STRANGER), request.capture());
         PlannerItemDto copied=request.getValue().blocks().getFirst().items().get(1);
@@ -719,7 +719,7 @@ class TripPublicationServiceTests {
          """);
         when(publicationRepository.findByTokenAndStatus("tok-existing",TripPublication.PublicationStatus.ACTIVE)).thenReturn(Optional.of(publication));
         when(tripRepository.saveAndFlush(any())).thenAnswer(call->{Trip trip=call.getArgument(0);trip.setId(UUID.randomUUID());trip.setVersion(0L);return trip;});
-        service.copySharedPlan("tok-existing",STRANGER);
+        service.copySharedPlan("tok-existing",STRANGER,new com.navio.tripplanningservice.dto.publication.CopyPlanRequest("change",java.time.LocalDate.of(2032,3,10)));
         var capture=ArgumentCaptor.forClass(PlannerSnapshotRequest.class);
         verify(plannerService).savePlannerSnapshot(any(),org.mockito.ArgumentMatchers.eq(STRANGER),capture.capture());
         var blocks=capture.getValue().blocks();
@@ -740,11 +740,11 @@ class TripPublicationServiceTests {
          """);
         when(publicationRepository.findByTokenAndStatus("tok-existing",TripPublication.PublicationStatus.ACTIVE)).thenReturn(Optional.of(publication));
         when(tripRepository.saveAndFlush(any())).thenAnswer(call->{Trip trip=call.getArgument(0);trip.setId(UUID.randomUUID());trip.setVersion(0L);return trip;});
-        service.copySharedPlan("tok-existing",STRANGER,new com.navio.tripplanningservice.dto.publication.CopyPlanRequest(mode,java.time.LocalDate.of(2030,1,1)));
+        service.copySharedPlan("tok-existing",STRANGER,new com.navio.tripplanningservice.dto.publication.CopyPlanRequest(mode,"retain".equals(mode)?java.time.LocalDate.of(2030,3,10):java.time.LocalDate.of(2030,1,1)));
         var capture=ArgumentCaptor.forClass(Trip.class);verify(tripRepository).saveAndFlush(capture.capture());
         var copied=capture.getValue();
         assertThat(java.time.temporal.ChronoUnit.DAYS.between(copied.getStartDate(),copied.getEndDate())).isEqualTo(6);
-        assertThat(copied.getStartDate()).isEqualTo("retain".equals(mode)?java.time.LocalDate.of(2027,3,10):java.time.LocalDate.of(2030,1,1));
+        assertThat(copied.getStartDate()).isEqualTo("retain".equals(mode)?java.time.LocalDate.of(2030,3,10):java.time.LocalDate.of(2030,1,1));
     }
 
     @Test
@@ -881,4 +881,21 @@ class TripPublicationServiceTests {
             return expected.getMessage();
         }
     }
+    @Test void copyRequiresAnExplicitStartDateBeforeCreatingAnyTrip() {
+        var publication=activePublication(2);publication.setListedInExplore(true);
+        when(publicationRepository.findByTokenAndStatus("tok-existing",TripPublication.PublicationStatus.ACTIVE)).thenReturn(Optional.of(publication));
+        assertThatThrownBy(()->service.copySharedPlan("tok-existing",STRANGER)).isInstanceOf(com.navio.tripplanningservice.service.PlannerService.PlannerValidationException.class);
+        verify(tripRepository,never()).saveAndFlush(any());verifyNoInteractions(copyEvents);
+    }
+
+    @Test void yearlessCopyCarriesSparseOffsetsAcrossNewYear() {
+        var publication=activePublication(2);publication.setListedInExplore(true);
+        publication.setSnapshot("{\"sanitizerVersion\":1,\"dayCount\":2,\"startDate\":\"12-31\",\"endDate\":\"01-03\",\"daySpan\":3,\"days\":[{\"label\":\"Day 1\",\"date\":\"12-31\",\"dayOffset\":0,\"items\":[]},{\"label\":\"Day 2\",\"date\":\"01-03\",\"dayOffset\":3,\"items\":[]}]}");
+        when(publicationRepository.findByTokenAndStatus("tok-existing",TripPublication.PublicationStatus.ACTIVE)).thenReturn(Optional.of(publication));
+        when(tripRepository.saveAndFlush(any())).thenAnswer(call->{Trip trip=call.getArgument(0);trip.setId(UUID.randomUUID());trip.setVersion(0L);return trip;});
+        service.copySharedPlan("tok-existing",STRANGER,new com.navio.tripplanningservice.dto.publication.CopyPlanRequest("retain",java.time.LocalDate.of(2032,12,31)));
+        var capture=ArgumentCaptor.forClass(Trip.class);verify(tripRepository).saveAndFlush(capture.capture());
+        assertThat(capture.getValue().getEndDate()).isEqualTo(java.time.LocalDate.of(2033,1,3));
+    }
+
 }

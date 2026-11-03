@@ -24,11 +24,16 @@ import java.util.List;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record PublicDayDto(
         String label,
-        LocalDate date,
+        @com.fasterxml.jackson.databind.annotation.JsonDeserialize(using=PublicMonthDayDeserializer.class)
+        @com.fasterxml.jackson.annotation.JsonFormat(pattern="MM-dd") java.time.MonthDay date,
         String title,
         String colorId,
         PublicAnchorDto startsAt,
         PublicAnchorDto endsAt,
-        List<PublicItemDto> items
+        List<PublicItemDto> items,
+        Integer dayOffset
 ) {
+    public PublicDayDto(String label, LocalDate date, String title, String colorId, PublicAnchorDto startsAt, PublicAnchorDto endsAt, List<PublicItemDto> items) {
+        this(label,date==null?null:java.time.MonthDay.from(date),title,colorId,startsAt,endsAt,items,null);
+    }
 }

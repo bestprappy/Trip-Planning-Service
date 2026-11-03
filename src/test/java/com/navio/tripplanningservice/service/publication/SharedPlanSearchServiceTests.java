@@ -70,14 +70,14 @@ class SharedPlanSearchServiceTests {
        withPlaces(row("japan","Food tour","Tokyo","Japan",3),"restaurant","Food market","Tokyo, Japan"));
   var result=service.search("Huahin scenary and food trip","",null,0,12,"relevance");
   assertThat(result.matching()).extracting(p->p.token()).containsExactly("hua");
-  assertThat(result.related()).extracting(p->p.token()).containsExactly("bangkok");
+  assertThat(result.related()).isEmpty();
   assertThat(result.correction()).contains("Hua Hin").contains("scenic");
  }
  @Test void relatedTitlesRemainWhenNoStrongPlanMatchesAndFiltersNeverRelax(){
   rows(row("thai","Quiet escape","Hua Hin","Thailand",4),row("other","Quiet escape","Tokyo","Japan",4));
   var result=service.search("Thailand food trip","",null,0,12,"relevance");
-  assertThat(result.matching()).isEmpty();assertThat(result.relatedPlans()).extracting(p->p.token()).containsExactly("thai");
-  assertThat(result.relatedTotal()).isEqualTo(1);assertThat(result.reasons().get("thai")).contains("Thailand");
+  assertThat(result.matching()).isEmpty();assertThat(result.relatedPlans()).isEmpty();
+  assertThat(result.relatedTotal()).isZero();assertThat(result.reasons()).isEmpty();
   assertThat(service.search("Thailand food trip","TH",5,0,12,"relevance").related()).isEmpty();
  }
  @Test void regionAndFillerWordsDoNotHideRelevantPlansOrShowUnrelatedCountries(){
@@ -91,8 +91,8 @@ class SharedPlanSearchServiceTests {
   var values=new ArrayList<TripPublication>();for(int i=0;i<30;i++)values.add(row("r"+i,"Quiet escape "+i,"Hua Hin","Thailand",4));
   rows(values.toArray(TripPublication[]::new));var first=service.search("Thailand food trip","",null,0,12,"relevance");
   var next=service.search("Thailand food trip","",null,1,12,"relevance");
-  assertThat(first.related()).hasSize(12);assertThat(next.related()).hasSize(12);assertThat(next.related()).doesNotContainAnyElementsOf(first.related());
-  assertThat(first.relatedLast()).isFalse();assertThat(first.destinations()).anyMatch(d->d.label().equals("Thailand"));
+  assertThat(first.related()).isEmpty();assertThat(next.related()).isEmpty();assertThat(next.related()).isEmpty();
+  assertThat(first.relatedLast()).isTrue();assertThat(first.destinations()).anyMatch(d->d.label().equals("Thailand"));
  }
 
  @Test void sameNameCitiesUseTypedOrSelectedCountryWithoutArbitraryCatalogueOrder(){
@@ -105,7 +105,7 @@ class SharedPlanSearchServiceTests {
  @Test void legacyClientsDoNotPageThroughRelatedOnlyResults(){
   var values=new ArrayList<TripPublication>();for(int i=0;i<30;i++)values.add(row("r"+i,"Quiet escape "+i,"Hua Hin","Thailand",4));
   rows(values.toArray(TripPublication[]::new));var result=service.search("Thailand food trip","",null,0,12,"relevance");
-  assertThat(result.last()).isTrue();assertThat(result.matchingLast()).isTrue();assertThat(result.relatedLast()).isFalse();
+  assertThat(result.last()).isTrue();assertThat(result.matchingLast()).isTrue();assertThat(result.relatedLast()).isTrue();
  }
 
  @Test void shortCountryAliasesStillAnchorMultiwordQueries(){
@@ -124,6 +124,66 @@ class SharedPlanSearchServiceTests {
   rows(withPlaces(row("beach","Coast escape","Hua Hin","Thailand",4),"tourist_attraction","Beach viewpoint","Hua Hin, Thailand"),
        withPlaces(row("mountain","Mountain escape","Hua Hin","Thailand",4),"park","Mountain garden","Hua Hin, Thailand"));
   var result=service.search("Hua Hin beach trip","",null,0,12,"relevance");
-  assertThat(result.matching()).extracting(p->p.token()).containsExactly("beach");assertThat(result.related()).extracting(p->p.token()).containsExactly("mountain");
+  assertThat(result.matching()).extracting(p->p.token()).containsExactly("beach");assertThat(result.related()).isEmpty();
  }
+ TripPublication dated(TripPublication row,int day,boolean shared){
+  row.setSnapshot(row.getSnapshot().replace("\"days\":[]","\"included\":{\"includeDates\":"+shared+"},\"days\":[{\"date\":\"2026-12-"+String.format("%02d",day)+"\",\"items\":[]}]"));return row;
+ }
+ @Test void judgedChristmasCatalogueHasNoCountryOnlyFalsePositivesAndRanksEvidence(){
+  rows(row("exact","Christmas markets","Bangkok","Thailand",3),dated(row("near","Quiet escape","Bangkok","Thailand",3),25,true),dated(row("early","Quiet escape","Bangkok","Thailand",3),3,true),dated(row("hidden","Coastal escape","Bangkok","Thailand",3),25,false),row("ordinary","Popular coast","Bangkok","Thailand",3),row("wrong","Christmas","Tokyo","Japan",3));
+  var result=service.search("Thailand Christmas trip","",null,0,12,"relevance");
+  assertThat(result.matching()).extracting(p->p.token()).containsExactly("exact");
+  assertThat(result.related()).extracting(p->p.token()).containsExactly("near","early");
+  assertThat(result.relatedTotal()).isEqualTo(2);assertThat(result.matchingTotal()).isEqualTo(1);
+  assertThat(result.relatedPlans()).extracting(p->p.token()).containsExactly("near","early");
+  assertThat(result.reasons().values()).allMatch(r->r.contains("December"));
+  assertThat(service.search("Thailand Christmas 2026","",null,0,12,"relevance").notice()).contains("year");
+ }
+ @Test void temporalRelevantPoolPaginatesWithoutDuplicates(){
+  var values=new ArrayList<TripPublication>();for(int i=0;i<30;i++)values.add(dated(row("dec"+i,"Quiet escape","Bangkok","Thailand",3),25,true));
+  rows(values.toArray(TripPublication[]::new));
+  var first=service.search("Thailand Christmas","TH",3,0,12,"relevance");var next=service.search("Thailand Christmas","TH",3,1,12,"relevance");
+  assertThat(first.related()).hasSize(12);assertThat(next.related()).hasSize(12);assertThat(first.relatedLast()).isFalse();
+  assertThat(next.related()).doesNotContainAnyElementsOf(first.related());assertThat(first.matching()).isEmpty();
+ }
+
+ @Test void publicIntroductionCanSupportActivityButSuggestionCannotDiscardIt(){
+  var plan=row("intro","City break","Bangkok","Thailand",3);
+  plan.setSnapshot(plan.getSnapshot().replace("\"days\":[]","\"startingPart\":{\"title\":\"Before you go\",\"content\":\"A food itinerary visiting sushi restaurants.\"},\"days\":[]"));
+  rows(plan);
+  var result=service.search("Thailand food","",null,0,12,"relevance");
+  assertThat(result.matching()).extracting(p->p.token()).containsExactly("intro");
+  assertThat(result.querySuggestions()).noneMatch(p->p.text().equals("City break"));
+ }
+ @Test void speculativeFoodNotesDoNotEstablishActivity(){
+  var plan=row("intro","City break","Bangkok","Thailand",3);
+  plan.setSnapshot(plan.getSnapshot().replace("\"days\":[]","\"startingPart\":{\"title\":\"Before you go\",\"content\":\"Maybe consider food stops.\"},\"days\":[]"));rows(plan);
+  assertThat(service.search("Thailand food","",null,0,12,"relevance").matching()).isEmpty();
+ }
+
+ @Test void cataloguePhraseMustPreserveTheTypedActivity(){
+  rows(withPlaces(row("title","City break","Bangkok","Thailand",3),"restaurant","Sushi restaurant","Bangkok, Thailand"));
+  var result=service.search("Thailand sushi","",null,0,12,"relevance");
+  assertThat(result.matching()).hasSize(1);assertThat(result.querySuggestions()).noneMatch(p->p.text().equals("City break"));
+ }
+
+ @Test void ownerQuestionsDoNotClaimAffirmativeActivitiesOrEvents(){
+  for(String question:List.of("Visit the Christmas market?","Should we visit a sushi restaurant?")){
+   var plan=row("question","City break","Bangkok","Thailand",3);
+   plan.setSnapshot(plan.getSnapshot().replace("\"days\":[]","\"startingPart\":{\"title\":\"Ideas\",\"content\":\""+question+"\"},\"days\":[]"));rows(plan);
+   assertThat(service.search(question.contains("Christmas")?"Thailand Christmas":"Thailand food","",null,0,12,"relevance").matching()).isEmpty();
+  }
+ }
+
+ @Test void thousandPlanCatalogueKeepsResultWindowsBoundedAndCountsAccurate(){
+  var values=new ArrayList<TripPublication>();for(int i=0;i<1000;i++)values.add(dated(row("load"+i,"Quiet escape","Bangkok","Thailand",3),25,true));
+  rows(values.toArray(TripPublication[]::new));
+  var elapsed=new ArrayList<Long>();
+  for(int run=0;run<3;run++){
+   long before=System.nanoTime();var result=service.search("Thailand Christmas","TH",3,0,12,"relevance");elapsed.add((System.nanoTime()-before)/1_000_000);
+   assertThat(result.relatedTotal()).isEqualTo(1000);assertThat(result.related()).hasSize(12);assertThat(result.relatedPlans()).hasSize(4);assertThat(result.matching()).isEmpty();
+  }
+  System.out.println("Search benchmark: 1000 public plans, three requests in ms="+elapsed);
+ }
+
 }

@@ -6,7 +6,9 @@ import java.util.regex.Pattern;
 /** Deterministic interpretation of travel queries; no private state or generated facts. */
 final class PlanSearchQuery {
     record Location(String name, String country, boolean countryLevel) {}
-    record Evidence(String title, String text, Set<String> countries, Set<String> themes) {}
+    record Evidence(String title, String text, Set<String> countries, Set<String> themes, List<java.time.MonthDay> dates) {
+        Evidence(String title,String text,Set<String> countries,Set<String> themes){this(title,text,countries,themes,List.of());}
+    }
     record Match(boolean strong, int score, String reason) {}
     static final Map<String, List<String>> THEMES = Map.of(
         "food", List.of("food", "dining", "restaurant", "restaurants", "cafe", "cafes", "culinary", "seafood", "sushi", "eat", "eating"),
@@ -18,6 +20,7 @@ final class PlanSearchQuery {
     );
     private static final Set<String> GENERAL_INTENT = Set.of("food","dining","culinary","eat","eating","scenic","scenery","scenary","view","views","landscape","culture","cultural","ev","electric vehicle","road trip","roadtrip","drive","driving","walk","walking");
     private static final Set<String> FILLER = Set.of("a","an","the","and","or","in","of","for","to","with","on","my","our","your","trip","trips","plan","plans","itinerary","itineraries","travel","focus","focused","tour","tours","route","routes");
+    final PlanSearchTemporalIntent temporal;
     final String normalized;
     final String correction;
     final List<Location> geography;
@@ -45,7 +48,8 @@ final class PlanSearchQuery {
     }
     private PlanSearchQuery(String text, Collection<Location> locations, String selectedCountry) {
         normalized = normal(text);
-        String remaining = normalized;
+        temporal=PlanSearchTemporalIntent.parse(normalized);
+        String remaining = temporal.remove(normalized);
         String corrected = text.strip().replaceAll("(?i)\\bscenary\\b", "scenic");
         var explicitCountries=new HashSet<String>();
         locations.stream().filter(Location::countryLevel).filter(l->Pattern.compile(locationPattern(l.name())).matcher(normalized).find()).forEach(l->explicitCountries.add(l.country()));
@@ -113,18 +117,15 @@ final class PlanSearchQuery {
         for(Location location:geography) if(!location.countryLevel()) {locals++;if(Pattern.compile(locationPattern(location.name())).matcher(normal(item.text())).find())localHits++;}
         int themeHits=(int)themes.stream().filter(item.themes()::contains).count();
         int termHits=(int)terms.stream().filter(t->tokenMatch(t,item.text())).count();
-        boolean informative=!geography.isEmpty()||!themes.isEmpty()||!terms.isEmpty();
-        boolean strong=localHits==locals&&themeHits==themes.size()&&termHits==terms.size();
-        if(!informative) strong=true; // Empty/filter-only queries preserve catalogue browsing.
-        boolean related=localHits>0||!anchors.isEmpty()||themeHits>0||termHits>0&&(double)termHits/Math.max(1,terms.size())>=0.34;
-        if(!strong&&!related)return null;
-        int score=localHits*100+(!anchors.isEmpty()?40:0)+themeHits*25+termHits*10;
+        if(localHits!=locals||themeHits!=themes.size()||termHits!=terms.size())return null;
+        var time=temporal.match(item.text(),item.dates());
+        if(!time.eligible())return null;
+        boolean lexical=terms.stream().allMatch(t->Arrays.stream(normal(item.text()).split(" ")).anyMatch(w->w.equals(t)||t.length()>=2&&w.startsWith(t)));
+        boolean strong=time.direct()&&lexical;
+        int score=localHits*100+themeHits*25+termHits*10+time.score();
         String title=normal(item.title());
         score+=title.equals(normalized)?140:title.startsWith(normalized)&&!normalized.isBlank()?80:title.contains(normalized)&&!normalized.isBlank()?40:0;
-        String reason=localHits>0?"Also in "+geography.stream().filter(g->!g.countryLevel()&&Pattern.compile(locationPattern(g.name())).matcher(normal(item.text())).find()).findFirst().orElseThrow().name()
-            :!anchors.isEmpty()?"Also in "+countryNames.getOrDefault(anchors.stream().sorted().findFirst().orElseThrow(),anchors.stream().sorted().findFirst().orElseThrow())
-            :themeHits>0? switch(themes.stream().filter(item.themes()::contains).sorted().findFirst().orElseThrow()) {case "food"->"Includes food stops";case "scenic"->"Includes scenic places";case "culture"->"Includes cultural stops";case "ev"->"Includes EV travel";case "walk"->"Includes walking";default->"Includes driving";}
-            :"Shares part of your search";
+        String reason=!time.reason().isEmpty()?time.reason():!lexical?"Close spelling match to your search":"Matches your travel interests";
         return new Match(strong,score,reason);
     }
 }
