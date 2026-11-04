@@ -210,6 +210,8 @@ public class PlannerService {
     }
 
     private void applyItem(BlockItem item, PlannerItemDto dto, int displayOrder) {
+        // Client saves echo provider evidence or omit it; an omission only clears it when the station changes.
+        boolean sameStation = Objects.equals(item.getPlaceId(), dto.placeId());
         // An unchanged legacy snapshot cannot erase precision it cannot represent.
         PlannerEvChargerDto incomingCharge = dto.evCharger();
         boolean unchangedLegacyCharge = incomingCharge != null
@@ -267,6 +269,14 @@ public class PlannerService {
             item.setEvOperatorName(clamp(evCharger.operatorName(), BlockItemTextLimits.OPERATOR_NAME));
             item.setEvSelectionSource(Objects.requireNonNullElse(evCharger.selectionSource(), "MANUAL"));
             item.setEvLocked(Boolean.TRUE.equals(evCharger.locked()));
+            if (evCharger.stationStatus() != null || !sameStation) {
+                item.setEvStationStatus(evCharger.stationStatus());
+                item.setEvStatusSource(evCharger.statusSource());
+                item.setEvStatusCheckedAt(evCharger.statusCheckedAt());
+            }
+            if (evCharger.connectorPowerKw() != null || !sameStation) {
+                item.setEvConnectorPowerKw(evCharger.connectorPowerKw());
+            }
             item.setIsCharged(Boolean.TRUE.equals(dto.isVisited()));
         }
     }
@@ -314,6 +324,10 @@ public class PlannerService {
     }
 
     private void clearEvSnapshot(BlockItem item) {
+        item.setEvStationStatus(null);
+        item.setEvStatusSource(null);
+        item.setEvStatusCheckedAt(null);
+        item.setEvConnectorPowerKw(null);
         item.setEvConnectorTypes(null);
         item.setPowerKw(null);
         item.setEvTotalConnectors(null);
@@ -461,7 +475,8 @@ public class PlannerService {
                         item.getEstimatedChargeMinutes(),
                         item.getEvOperatorName(),
                         Objects.requireNonNullElse(item.getEvSelectionSource(), "MANUAL"),
-                        Boolean.TRUE.equals(item.getEvLocked()), item.getTargetBatteryPct(), item.getChargingDurationMinutes(), item.getPlannedDepartureSocPct())
+                        Boolean.TRUE.equals(item.getEvLocked()), item.getTargetBatteryPct(), item.getChargingDurationMinutes(), item.getPlannedDepartureSocPct(),
+                        item.getEvStationStatus(), item.getEvStatusSource(), item.getEvStatusCheckedAt(), item.getEvConnectorPowerKw())
                 : null;
 
         return new PlannerItemDto(

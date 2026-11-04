@@ -282,6 +282,10 @@ public class TripEvOptimizationApplier {
         item.setChargingDurationMinutes(estimatedChargeMinutes);
         item.setPlannedDepartureSocPct(departureSocPct);
         item.setEvOperatorName(clamp(charger.operatorName(), BlockItemTextLimits.OPERATOR_NAME));
+        item.setEvStationStatus(charger.status());
+        item.setEvStatusSource(clamp(charger.source(), 32));
+        item.setEvStatusCheckedAt(charger.statusCheckedAt());
+        item.setEvConnectorPowerKw(charger.connectorPowerKw().isEmpty() ? null : charger.connectorPowerKw());
         if (item.getEvSelectionSource() == null) {
             item.setEvSelectionSource("AUTO");
         }

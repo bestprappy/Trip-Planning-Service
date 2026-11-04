@@ -94,6 +94,26 @@ class ChargingPlanPersistenceTests {
         planner.savePlannerSnapshot(f.tripId(), f.userId(), json.treeToValue(legacy, PlannerSnapshotRequest.class));
         assertThat(planner.getPlannerSnapshot(f.tripId(), f.userId()).blocks().getFirst().items().getFirst().evCharger()).isEqualTo(charge);
     }
+    @Test void stationEvidenceSurvivesApplySaveAndReopenAndOlderRowsStayNull() {
+        var f = fixture();
+        var older = tx().execute(status -> em.find(BlockItem.class, f.stopId()));
+        assertThat(older.getEvStationStatus()).isNull();
+        assertThat(older.getEvStatusCheckedAt()).isNull();
+        assertThat(older.getEvConnectorPowerKw()).isNull();
+        var checkedAt = java.time.Instant.parse("2026-11-04T09:00:00Z");
+        var station = new MobilityEvCharger("station", "Station", "Operator", new MobilityEvCharger.Location(13,100,"Address","station"), "Address", null,
+                List.of("CCS2","TYPE2"),150,2,null,null,Map.of(),"GOOGLE_PLACES","GOOGLE_CACHED","temporarily_closed",0,0,0,false,Map.of("CCS2",150.0,"TYPE2",22.0),checkedAt);
+        var operation = new MobilityEvOptimizationResponse.Operation("UPDATE_CHARGER","charger",null,0,station,5.125,30,47.0,0,"test");
+        applier.apply(f.tripId(),f.userId(),"day",f.version(),new MobilityEvOptimizationResponse("day",true,List.of(operation),47.0,0,5.125,"test",List.of()));
+        var loaded = planner.getPlannerSnapshot(f.tripId(),f.userId());
+        var charge = loaded.blocks().getFirst().items().getFirst().evCharger();
+        assertThat(charge.stationStatus()).isEqualTo("temporarily_closed");
+        assertThat(charge.statusSource()).isEqualTo("GOOGLE_PLACES");
+        assertThat(charge.statusCheckedAt()).isEqualTo(checkedAt);
+        assertThat(charge.connectorPowerKw()).containsEntry("CCS2",150.0).containsEntry("TYPE2",22.0);
+        planner.savePlannerSnapshot(f.tripId(),f.userId(),new PlannerSnapshotRequest(loaded.version(),loaded.blocks(),loaded.budget(),loaded.energyState()));
+        assertThat(planner.getPlannerSnapshot(f.tripId(),f.userId()).blocks().getFirst().items().getFirst().evCharger()).isEqualTo(charge);
+    }
     @Test void rollbackAfterFlushedApplyRestoresEverySavedFieldAndVersion() {
         var f = fixture();
         assertThatThrownBy(() -> tx().execute(status -> {

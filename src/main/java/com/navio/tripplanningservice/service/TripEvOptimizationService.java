@@ -312,12 +312,24 @@ public class TripEvOptimizationService {
                 openingHours,
                 "TRIP_SNAPSHOT",
                 "STALE",
-                "active",
+                // Stops saved before status was kept have none to report. Mobility re-checks them, and marks
+                // any it cannot reach as unconfirmed rather than trusting this.
+                Objects.requireNonNullElse(item.getEvStationStatus(), "active"),
                 Objects.requireNonNullElse(item.getPlaceRating(), 0.0),
                 Objects.requireNonNullElse(item.getPlaceReviewCount(), 0),
                 0.35,
-                true
+                true,
+                savedPlugSpeeds(item),
+                item.getEvStatusCheckedAt()
         );
+    }
+
+    /** Mobility rejects a connector name it does not know, which would fail the whole plan over one bad entry. */
+    private Map<String, Double> savedPlugSpeeds(BlockItem item) {
+        if (item.getEvConnectorPowerKw() == null) return Map.of();
+        return item.getEvConnectorPowerKw().entrySet().stream()
+                .filter(entry -> SUPPORTED_CONNECTORS.contains(entry.getKey()) && entry.getValue() != null && entry.getValue() > 0)
+                .collect(java.util.stream.Collectors.toUnmodifiableMap(Map.Entry::getKey, Map.Entry::getValue));
     }
 
     private TripEvOptimizationPreviewResponse mapPreview(
@@ -384,7 +396,9 @@ public class TripEvOptimizationService {
                 charger.ratingAvg(),
                 charger.ratingCount(),
                 charger.confidenceScore(),
-                charger.stale()
+                charger.stale(),
+                charger.connectorPowerKw(),
+                charger.statusCheckedAt()
         );
     }
 

@@ -181,6 +181,20 @@ class TripEvOptimizationServiceTest {
     }
 
     @Test
+    void sendsASavedStopsStatusAndPlugSpeedsAndTreatsAStopSavedBeforeThemAsNotKnownPerPlug() {
+        Fixture fixture = fixture();
+        when(fixture.mobilityClient.optimize(any())).thenReturn(mobilityResponse());
+        fixture.service.preview(fixture.tripId, fixture.userId, request(null));
+        ArgumentCaptor<MobilityEvOptimizationRequest> sent = ArgumentCaptor.forClass(MobilityEvOptimizationRequest.class);
+        verify(fixture.mobilityClient).optimize(sent.capture());
+        var legacy = sent.getValue().stops().get(1).charger();
+        assertThat(legacy.status()).isEqualTo("active");
+        assertThat(legacy.stale()).isTrue();
+        assertThat(legacy.connectorPowerKw()).isEmpty();
+        assertThat(legacy.statusCheckedAt()).isNull();
+    }
+
+    @Test
     void aLaterDayWithABikeLegDoesNotBlockPlanningAnEarlierDayAndIsReportedAsUnchecked() {
         UUID tripId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();

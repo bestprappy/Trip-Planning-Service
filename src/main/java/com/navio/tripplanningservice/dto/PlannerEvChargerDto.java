@@ -19,8 +19,19 @@ public record PlannerEvChargerDto(
         Boolean locked,
         @jakarta.validation.constraints.Min(0) @jakarta.validation.constraints.Max(100) Integer targetBatteryPct,
         @jakarta.validation.constraints.DecimalMin("0.0") @jakarta.validation.constraints.DecimalMax("2147483647.0") Double chargingDurationMinutes,
-        @jakarta.validation.constraints.DecimalMin("0.0") @jakarta.validation.constraints.DecimalMax("100.0") Double plannedDepartureSocPct
+        @jakarta.validation.constraints.DecimalMin("0.0") @jakarta.validation.constraints.DecimalMax("100.0") Double plannedDepartureSocPct,
+        @Pattern(regexp = "active|temporarily_closed|permanently_closed|unknown") String stationStatus,
+        @jakarta.validation.constraints.Size(max = 32) String statusSource,
+        java.time.Instant statusCheckedAt,
+        java.util.Map<String, Double> connectorPowerKw
 ) {
+    public PlannerEvChargerDto(List<String> connectorTypes, Double maxKw, Integer totalConnectors,
+            Integer availableConnectors, String priceText, String openingHoursSummary,
+            Integer estimatedChargeMinutes, String operatorName, String selectionSource, Boolean locked, Integer targetBatteryPct,
+            Double chargingDurationMinutes, Double plannedDepartureSocPct) {
+        this(connectorTypes, maxKw, totalConnectors, availableConnectors, priceText, openingHoursSummary, estimatedChargeMinutes,
+                operatorName, selectionSource, locked, targetBatteryPct, chargingDurationMinutes, plannedDepartureSocPct, null, null, null, null);
+    }
     public PlannerEvChargerDto(List<String> connectorTypes, Double maxKw, Integer totalConnectors,
             Integer availableConnectors, String priceText, String openingHoursSummary,
             Integer estimatedChargeMinutes, String operatorName, String selectionSource, Boolean locked, Integer targetBatteryPct) {

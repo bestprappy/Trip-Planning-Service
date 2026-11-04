@@ -101,6 +101,16 @@ public class BlockItem {
     private String evSelectionSource;
     private Boolean evLocked;
 
+    /** What the provider last reported. Null on stops saved before this was kept. */
+    @Column(length = 32)
+    private String evStationStatus;
+    @Column(length = 32)
+    private String evStatusSource;
+    private java.time.Instant evStatusCheckedAt;
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
+    @Column(columnDefinition = "jsonb")
+    private java.util.Map<String, Double> evConnectorPowerKw;
+
     @Column
     private Integer targetBatteryPct;
 

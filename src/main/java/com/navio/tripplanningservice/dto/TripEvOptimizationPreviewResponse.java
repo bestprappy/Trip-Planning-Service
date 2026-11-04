@@ -52,7 +52,9 @@ public record TripEvOptimizationPreviewResponse(
             double ratingAvg,
             long ratingCount,
             double confidenceScore,
-            boolean stale
+            boolean stale,
+            Map<String, Double> connectorPowerKw,
+            java.time.Instant statusCheckedAt
     ) {
         public Charger {
             connectorTypes = connectorTypes == null ? List.of() : List.copyOf(connectorTypes);
