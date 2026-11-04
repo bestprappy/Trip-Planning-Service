@@ -31,6 +31,24 @@ class RestMobilityEvOptimizationClientTests {
         assertThat(client.optimize(request).finalSocPct()).isEqualTo(68.125);
         server.verify();
     }
+    @Test void aStationWithMissingOpeningHoursFieldsStaysUsable() {
+        // Found in the real run: Google often omits openNow, and a null value here crashed every plan
+        // that picked such a station, reported to the traveller as "temporarily unavailable".
+        var builder = RestClient.builder(); var server = MockRestServiceServer.bindTo(builder).build();
+        var discovery = mock(DiscoveryClient.class);
+        when(discovery.getInstances(anyString())).thenReturn(List.of());
+        var client = new RestMobilityEvOptimizationClient(builder, discovery, URI.create("http://mobility.test"));
+        server.expect(requestTo("http://mobility.test/internal/v1/ev-route/optimize-canonical-v2"))
+                .andRespond(withSuccess("""
+                        {"blockId":"day","feasible":true,"finalSocPct":40,"totalDrivingSeconds":60,"totalChargingMinutes":5,"message":"ok","warnings":[],
+                         "operations":[{"type":"ADD_CHARGER","sequence":1,"estimatedChargeMinutes":5,"arrivalSocPct":20,"departureSocPct":70,"detourKm":1,
+                          "charger":{"id":"station","name":"Station","location":{"lat":13,"lng":100},"connectorTypes":["CCS2"],"maxKw":120,"totalConnectors":2,
+                           "openingHours":{"openNow":null,"weekdayDescriptions":[],"summary":null},"status":"ACTIVE","ratingAvg":0,"ratingCount":0,"confidenceScore":0.8,"stale":false}}]}
+                        """, org.springframework.http.MediaType.APPLICATION_JSON));
+        var charger = client.optimize(new MobilityEvOptimizationRequest("day",List.of(),null,80,12,80,20)).operations().getFirst().charger();
+        assertThat(charger.openingHours()).doesNotContainKeys("openNow", "summary").containsKey("weekdayDescriptions");
+        server.verify();
+    }
     @Test void oldMobilityCannotSilentlyDropWholeTripContext() {
         var builder = RestClient.builder(); var server = MockRestServiceServer.bindTo(builder).build();
         var discovery = mock(DiscoveryClient.class);

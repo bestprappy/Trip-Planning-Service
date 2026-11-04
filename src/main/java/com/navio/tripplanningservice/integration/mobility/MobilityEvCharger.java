@@ -2,6 +2,7 @@ package com.navio.tripplanningservice.integration.mobility;
 
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 public record MobilityEvCharger(
         String id,
@@ -26,7 +27,10 @@ public record MobilityEvCharger(
 ) {
     public MobilityEvCharger {
         connectorTypes = connectorTypes == null ? List.of() : List.copyOf(connectorTypes);
-        openingHours = openingHours == null ? Map.of() : Map.copyOf(openingHours);
+        // Providers often omit fields such as openNow, which arrive as null values Map.copyOf rejects.
+        openingHours = openingHours == null ? Map.of() : openingHours.entrySet().stream()
+                .filter(entry -> entry.getValue() != null)
+                .collect(Collectors.toUnmodifiableMap(Map.Entry::getKey, Map.Entry::getValue));
     }
 
     public record Location(double lat, double lng, String address, String placeId) {
