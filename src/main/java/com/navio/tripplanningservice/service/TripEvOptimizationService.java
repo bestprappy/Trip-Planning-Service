@@ -77,9 +77,9 @@ public class TripEvOptimizationService {
         long version = trip.getVersion();
         var input = buildMobilityRequest(trip, request, false);
         requireCurrentVersion(tripId, userId, version);
-        MobilityEvOptimizationResponse response = mobilityClient.optimize(input);
+        MobilityEvOptimizationResponse response = mobilityClient.optimize(input.request());
         requireCurrentVersion(tripId, userId, version);
-        return mapPreview(version, response);
+        return mapPreview(version, response, input.laterDaysUnchecked());
     }
 
     public PlannerSnapshotResponse apply(
@@ -97,7 +97,7 @@ public class TripEvOptimizationService {
 
         var input = buildMobilityRequest(trip, request, true);
         requireCurrentVersion(tripId, userId, request.expectedVersion());
-        MobilityEvOptimizationResponse response = mobilityClient.optimize(input);
+        MobilityEvOptimizationResponse response = mobilityClient.optimize(input.request());
         if (!response.feasible()) {
             throw new TripEvOptimizationException(response.message());
         }
@@ -111,7 +111,10 @@ public class TripEvOptimizationService {
         return plannerService.getPlannerSnapshot(tripId, userId);
     }
 
-    private MobilityEvOptimizationRequest buildMobilityRequest(
+    private record OptimizationInput(MobilityEvOptimizationRequest request, boolean laterDaysUnchecked) {
+    }
+
+    private OptimizationInput buildMobilityRequest(
             Trip trip,
             TripEvOptimizationRequest request,
             boolean applying
@@ -131,11 +134,29 @@ public class TripEvOptimizationService {
         if (stops.size() < 2) {
             throw new TripEvOptimizationException("Add at least a starting place and destination before optimizing the EV route");
         }
-        return new MobilityEvOptimizationRequest(request.blockId(), stops, vehicle,
+        List<ListBlock> laterDays = days.subList(targetIndex + 1, days.size());
+        List<MobilityEvOptimizationRequest.Day> following = replayableDays(tripId, laterDays);
+        return new OptimizationInput(new MobilityEvOptimizationRequest(request.blockId(), stops, vehicle,
                 TripOptimizationEnergy.initialSoc(trip), request.effectiveReserveSocPct(),
-                request.effectiveTargetSocPct(), request.effectiveMaximumDetourKm(), preceding,
-                days.subList(targetIndex + 1, days.size()).stream()
-                        .map(day -> new MobilityEvOptimizationRequest.Day(day.getClientId(), routeStops(tripId, day))).toList());
+                request.effectiveTargetSocPct(), request.effectiveMaximumDetourKm(), preceding, following),
+                following.size() < laterDays.size());
+    }
+
+    /**
+     * Earlier days decide the battery this day starts with, so they must be modelled. Later days are
+     * only a look-ahead: one that cannot be modelled, such as a day out by train, must not stop the
+     * traveller planning today, and the days after it cannot be replayed without it.
+     */
+    private List<MobilityEvOptimizationRequest.Day> replayableDays(UUID tripId, List<ListBlock> laterDays) {
+        List<MobilityEvOptimizationRequest.Day> replayable = new ArrayList<>();
+        for (ListBlock day : laterDays) {
+            try {
+                replayable.add(new MobilityEvOptimizationRequest.Day(day.getClientId(), routeStops(tripId, day)));
+            } catch (TripEvOptimizationException notModellable) {
+                break;
+            }
+        }
+        return replayable;
     }
 
     private void checkVersion(Trip trip, TripEvOptimizationRequest request) {
@@ -301,8 +322,13 @@ public class TripEvOptimizationService {
 
     private TripEvOptimizationPreviewResponse mapPreview(
             long version,
-            MobilityEvOptimizationResponse response
+            MobilityEvOptimizationResponse response,
+            boolean laterDaysUnchecked
     ) {
+        List<String> warnings = new ArrayList<>(response.warnings());
+        if (laterDaysUnchecked) {
+            warnings.add("Later days with train, walking or cycling legs, or incomplete stops, were not checked against this plan.");
+        }
         return new TripEvOptimizationPreviewResponse(
                 version,
                 response.blockId(),
@@ -312,7 +338,7 @@ public class TripEvOptimizationService {
                 response.totalDrivingSeconds(),
                 response.totalChargingMinutes(),
                 response.message(),
-                response.warnings()
+                warnings
         );
     }
 

@@ -180,6 +180,36 @@ class TripEvOptimizationServiceTest {
         verify(fixture.mobilityClient).optimize(any());
     }
 
+    @Test
+    void aLaterDayWithABikeLegDoesNotBlockPlanningAnEarlierDayAndIsReportedAsUnchecked() {
+        UUID tripId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        ListBlock today = day("day-1", LocalDate.of(2026, 9, 22), "Home", "Hotel");
+        ListBlock later = day("day-2", LocalDate.of(2026, 9, 23), "Hotel", "Hotel");
+        BlockItem arrival = place("museum", "Museum", 13.7, 100.0);
+        arrival.setArrivalMode("bike");
+        TripRepository tripRepository = mock(TripRepository.class);
+        ListBlockRepository listBlockRepository = mock(ListBlockRepository.class);
+        BlockItemRepository itemRepository = mock(BlockItemRepository.class);
+        MobilityEvOptimizationClient mobilityClient = mock(MobilityEvOptimizationClient.class);
+        when(tripRepository.findByIdAndUserId(tripId, userId)).thenReturn(Optional.of(savedTrip(tripId, userId)));
+        when(tripRepository.findCurrentVersion(tripId, userId)).thenReturn(Optional.of(4L));
+        when(listBlockRepository.findByTripIdAndClientId(tripId, "day-1")).thenReturn(Optional.of(today));
+        when(listBlockRepository.findByTripIdOrderByDisplayOrder(tripId)).thenReturn(List.of(today, later));
+        when(itemRepository.findByBlockIdOrderByDisplayOrder(today.getId())).thenReturn(List.of(place("park", "Park", 13.6, 99.9)));
+        when(itemRepository.findByBlockIdOrderByDisplayOrder(later.getId())).thenReturn(List.of(arrival));
+        when(mobilityClient.optimize(any())).thenReturn(mobilityResponse());
+        var service = new TripEvOptimizationService(tripRepository, listBlockRepository, itemRepository, mobilityClient,
+                mock(TripEvOptimizationApplier.class), mock(PlannerService.class));
+
+        var preview = service.preview(tripId, userId, request(null));
+
+        ArgumentCaptor<MobilityEvOptimizationRequest> sent = ArgumentCaptor.forClass(MobilityEvOptimizationRequest.class);
+        verify(mobilityClient).optimize(sent.capture());
+        assertThat(sent.getValue().followingDays()).isEmpty();
+        assertThat(preview.warnings()).anyMatch(warning -> warning.contains("not checked"));
+    }
+
     private ListBlock day(String clientId, LocalDate date, String startName, String endName) {
         return ListBlock.builder()
                 .id(UUID.nameUUIDFromBytes(clientId.getBytes()))
