@@ -69,7 +69,8 @@ class PostgresSchemaTests {
                 // V17 precise charging plan, V18 transit route choice, V19 time source, V20 stop schedule,
                 // V21 copy events, V22 shared sections and trip vehicles, V23 day sections,
                 // V24 profile pins, V25 the trip.events.v1 outbox, and V26 saved station evidence.
-                assertThat(upgraded.migrate().migrationsExecuted).isEqualTo(14);
+                // V27 persisted feedback and V28 daily discovery activity are additive too.
+                assertThat(upgraded.migrate().migrationsExecuted).isEqualTo(15);
                 upgraded.validate();
                 try (var connection = java.sql.DriverManager.getConnection(upgradeUrl, username, password);
                      var sql = connection.createStatement(); var row = sql.executeQuery("SELECT count(*) FROM trip.shared_plan_copy WHERE publication_id='33333333-3333-4333-8333-333333333333'")) {
@@ -203,5 +204,20 @@ class PostgresSchemaTests {
             .destinationId("test").destinationName("Test").visibility(com.navio.tripplanningservice.model.TripVisibility.PRIVATE).build();
         entityManager.persist(trip);
         return trip;
+    }
+
+    @Test void dailyActivityWindowIncludesTodayAndSixPriorUtcDates() throws Exception {
+        var jdbc=new org.springframework.jdbc.core.JdbcTemplate(dataSource);
+        var trip=java.util.UUID.randomUUID();var publication=java.util.UUID.randomUUID();
+        jdbc.update("INSERT INTO trip.trip(id,user_id,display_name,destination_id,destination_name,start_date,end_date) VALUES(?,?,?,'test','Thailand','2026-01-01','2026-01-02')",trip,java.util.UUID.randomUUID(),"Activity test");
+        jdbc.update("INSERT INTO trip.trip_publication(id,trip_id,token,snapshot,sanitizer_version,source_trip_version,status) VALUES(?,?,?,?::jsonb,1,0,'ACTIVE')",publication,trip,"activity-test","{}");
+        var repository=new com.navio.tripplanningservice.repository.PublicationActivityRepository(org.springframework.jdbc.core.simple.JdbcClient.create(dataSource));
+        var today=java.time.LocalDate.now(java.time.Clock.systemUTC());
+        repository.view(publication);repository.view(publication);
+        var copies=new com.navio.tripplanningservice.repository.SharedPlanCopyRepository(org.springframework.jdbc.core.simple.JdbcClient.create(dataSource));
+        var copiedTrip=java.util.UUID.randomUUID();var user=java.util.UUID.randomUUID();
+        copies.recordSuccessfulCopy(publication,copiedTrip,user);copies.recordSuccessfulCopy(publication,copiedTrip,user);
+        jdbc.update("INSERT INTO trip.publication_daily_activity(publication_id,activity_day,views,copies) VALUES(?,?,4,2),(?,?,100,100)",publication,today.minusDays(6),publication,today.minusDays(7));
+        assertThat(repository.scores(today).get(publication)).isEqualTo(15);
     }
 }

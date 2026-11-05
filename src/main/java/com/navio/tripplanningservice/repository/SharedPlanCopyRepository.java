@@ -17,10 +17,18 @@ public class SharedPlanCopyRepository {
         public static final CopyStats ZERO = new CopyStats(0, 0);
     }
     public void recordSuccessfulCopy(UUID publicationId, UUID copiedTripId, UUID userId) {
-        jdbc.sql("""
+        int inserted=jdbc.sql("""
             INSERT INTO trip.shared_plan_copy (copied_trip_id, publication_id, copied_by)
             VALUES (:trip, :publication, :user) ON CONFLICT (copied_trip_id) DO NOTHING
             """).param("trip", copiedTripId).param("publication", publicationId).param("user", userId).update();
+        if(inserted>0)activityCopy(publicationId);
+    }
+    private void activityCopy(UUID id){
+        jdbc.sql("""
+          INSERT INTO trip.publication_daily_activity(publication_id,activity_day,copies)
+          VALUES (:id,(now() AT TIME ZONE 'UTC')::date,1)
+          ON CONFLICT(publication_id,activity_day) DO UPDATE SET copies=publication_daily_activity.copies+1
+          """).param("id",id).update();
     }
     public Map<UUID, CopyStats> counts(Collection<UUID> publicationIds) {
         if (publicationIds.isEmpty()) return Map.of();

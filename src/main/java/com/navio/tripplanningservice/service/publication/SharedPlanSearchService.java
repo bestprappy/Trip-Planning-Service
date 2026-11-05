@@ -20,6 +20,15 @@ public class SharedPlanSearchService {
     private final ObjectMapper mapper;
     private final ExplorePlanSummarizer summarizer;
     private final SharedPlanCopyRepository copies;
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private com.navio.tripplanningservice.repository.PublicationActivityRepository activity;
+    java.time.Clock discoveryClock=java.time.Clock.systemUTC();
+    java.time.LocalDate discoveryToday(){return java.time.LocalDate.now(discoveryClock);}
+    Map<UUID,Long> activityScores(java.time.LocalDate today){return activity==null?Map.of():activity.scores(today);}
+    public SearchPage search(String term,String country,Integer days,int page,int size,String sort,String collections,String themes){
+        var filters=PlanDiscovery.Filters.parse(collections,themes);
+        return new SmartPlanSearchEngine(this,repository,summarizer,copies).search(term,country,days,page,size,sort,filters);
+    }
     static final Map<String,String> COUNTRIES=new TreeMap<>(),CODES=new HashMap<>();
     @org.springframework.beans.factory.annotation.Value("${navio.search.smart-enabled:true}")
     private boolean smartEnabled=true;

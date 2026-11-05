@@ -67,6 +67,8 @@ public class TripPublicationService {
     private final ExplorePlanSummarizer summarizer;
     private final TripService tripService;
     private final com.navio.tripplanningservice.repository.SharedPlanCopyRepository copyEvents;
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private com.navio.tripplanningservice.repository.PublicationActivityRepository activity;
     private final PublicationEvents publicationEvents;
 
     public PublicationResponse getPublication(UUID tripId, UUID userId) {
@@ -199,6 +201,7 @@ public class TripPublicationService {
         PublicPlanSnapshot snapshot = deserialize(publication);
         if (publication.isListed()) {
             publicationRepository.incrementViewCount(publication.getId());
+            if(activity!=null)activity.view(publication.getId());
         }
         return new SharedPlanResponse(
                 snapshot,

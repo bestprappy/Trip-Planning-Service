@@ -1,0 +1,63 @@
+package com.navio.tripplanningservice.service.publication;
+
+import java.time.*;
+import java.time.temporal.ChronoUnit;
+import java.util.*;
+
+/** Public calendar evidence, never a forecast or inferred private travel year. */
+final class PlanDiscovery {
+    static final Set<String> SORTS=Set.of("relevance","recent","trending","popular","views","rating","discussed");
+    record Filters(Set<String> collections,Set<String> themes) {
+        static final Filters NONE=new Filters(Set.of(),Set.of());
+        static Filters parse(String collections,String themes){return new Filters(values(collections,Set.of("seasonal","events","trending")),values(themes,Set.of("nature","food","culture","ev")));}
+        private static Set<String> values(String raw,Set<String> allowed){
+            if(raw==null||raw.isBlank())return Set.of();
+            if(raw.length()>100)throw new IllegalArgumentException("Invalid discovery filters");
+            var result=new TreeSet<>(Arrays.asList(raw.split(",",-1)));
+            if(!allowed.containsAll(result))throw new IllegalArgumentException("Invalid discovery filters");
+            return Collections.unmodifiableSet(result);
+        }
+        boolean accepts(PublicSearchEvidence e,LocalDate today){
+            return (collections.isEmpty()||collections.contains("trending")||collections.contains("seasonal")&&seasonal(e,today)||collections.contains("events")&&event(e,today))
+                &&(themes.isEmpty()||themes.stream().anyMatch(t->e.strong().contains(t)||t.equals("nature")&&e.strong().contains("scenic")));
+        }
+        String signature(){return String.join(",",new TreeSet<>(collections))+"|"+String.join(",",new TreeSet<>(themes));}
+    }
+    static boolean seasonal(PublicSearchEvidence e,LocalDate today){return e.dates().stream().anyMatch(d->d.getMonthValue()==today.getMonthValue());}
+    record Occasion(String name,LocalDate date,int before,int after) {}
+    static List<Occasion> upcoming(LocalDate today){
+        var result=new ArrayList<Occasion>();
+        for(int year=today.getYear()-1;year<=today.getYear()+1;year++)for(var event:List.of(
+            new Occasion("christmas",LocalDate.of(year,12,25),7,2),new Occasion("new year",LocalDate.of(year,1,1),6,6),
+            new Occasion("easter",easter(year),7,1))){
+            long until=ChronoUnit.DAYS.between(today,event.date());
+            if(until>=-event.after()&&until<=45)result.add(event);
+        }
+        return List.copyOf(result);
+    }
+    static boolean event(PublicSearchEvidence e,LocalDate today){
+        return upcoming(today).stream().anyMatch(event->{
+            boolean mention=TravelConcepts.has(e.eventText(),event.name())||event.name().equals("christmas")&&TravelConcepts.has(e.eventText(),"xmas");
+            // Orthodox Easter must not be silently assigned the Western calendar.
+            if(event.name().equals("easter")&&TravelConcepts.has(e.eventText(),"orthodox"))return false;
+            if(!mention)return false;
+            if(e.dates().isEmpty())return true;
+            for(int offset=-event.before();offset<=event.after();offset++)if(e.dates().contains(MonthDay.from(event.date().plusDays(offset))))return true;
+            return false;
+        });
+    }
+    static long eventProximity(PublicSearchEvidence e,LocalDate today){
+        if(e.dates().isEmpty())return 366;
+        long nearest=366;
+        for(var occasion:upcoming(today)){
+            if(!TravelConcepts.has(e.eventText(),occasion.name())&&!(occasion.name().equals("christmas")&&TravelConcepts.has(e.eventText(),"xmas")))continue;
+            for(var date:e.dates())for(int year=occasion.date().getYear()-1;year<=occasion.date().getYear()+1;year++){
+                if(!date.isValidYear(year))continue;
+                nearest=Math.min(nearest,Math.abs(ChronoUnit.DAYS.between(date.atYear(year),occasion.date())));
+            }
+        }
+        return nearest;
+    }
+    /** Gregorian (Western) Easter, computed for discovery's current occurrence only. */
+    static LocalDate easter(int year){int a=year%19,b=year/100,c=year%100,d=b/4,e=b%4,f=(b+8)/25,g=(b-f+1)/3,h=(19*a+b-d-g+15)%30,i=c/4,k=c%4,l=(32+2*e+2*i-h-k)%7,m=(a+11*h+22*l)/451,n=h+l-7*m+114;return LocalDate.of(year,n/31,n%31+1);}
+}
