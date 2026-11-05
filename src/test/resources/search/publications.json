@@ -1,0 +1,222 @@
+[
+  {
+    "id": "mountain",
+    "title": "Northern escape",
+    "country": "Thailand",
+    "type": "national_park",
+    "name": "Mountain viewpoint",
+    "dayCount": 3,
+    "date": null,
+    "optional": false,
+    "listed": true
+  },
+  {
+    "id": "forest",
+    "title": "Green escape",
+    "country": "Thailand",
+    "type": "national_park",
+    "name": "Forest trail",
+    "dayCount": 3,
+    "date": null,
+    "optional": false,
+    "listed": true
+  },
+  {
+    "id": "garden",
+    "title": "Quiet afternoon",
+    "country": "Thailand",
+    "type": "botanical_garden",
+    "name": "Botanical garden",
+    "dayCount": 3,
+    "date": null,
+    "optional": false,
+    "listed": true
+  },
+  {
+    "id": "beach",
+    "title": "Coast escape",
+    "country": "Thailand",
+    "type": "beach",
+    "name": "Beach",
+    "dayCount": 3,
+    "date": null,
+    "optional": false,
+    "listed": true
+  },
+  {
+    "id": "mall",
+    "title": "City escape",
+    "country": "Thailand",
+    "type": "shopping_mall",
+    "name": "Shopping mall",
+    "dayCount": 3,
+    "date": null,
+    "optional": false,
+    "listed": true
+  },
+  {
+    "id": "christmas",
+    "title": "Christmas markets",
+    "country": "Thailand",
+    "type": "tourist_attraction",
+    "name": "Central square",
+    "dayCount": 3,
+    "date": "12-25",
+    "optional": false,
+    "listed": true
+  },
+  {
+    "id": "dec25",
+    "title": "Culture visit",
+    "country": "Thailand",
+    "type": "museum",
+    "name": "Museum",
+    "dayCount": 3,
+    "date": "12-25",
+    "optional": false,
+    "listed": true
+  },
+  {
+    "id": "dec3",
+    "title": "History visit",
+    "country": "Thailand",
+    "type": "museum",
+    "name": "Museum",
+    "dayCount": 3,
+    "date": "12-03",
+    "optional": false,
+    "listed": true
+  },
+  {
+    "id": "sushi",
+    "title": "Lunch visit",
+    "country": "Thailand",
+    "type": "restaurant",
+    "name": "Sushi restaurant",
+    "dayCount": 3,
+    "date": null,
+    "optional": false,
+    "listed": true
+  },
+  {
+    "id": "weekend",
+    "title": "Weekend mountain escape",
+    "country": "Thailand",
+    "type": "national_park",
+    "name": "Mountain",
+    "dayCount": 3,
+    "date": null,
+    "optional": false,
+    "listed": true
+  },
+  {
+    "id": "jpmountain",
+    "title": "Highland escape",
+    "country": "Japan",
+    "type": "national_park",
+    "name": "Mountain",
+    "dayCount": 3,
+    "date": null,
+    "optional": false,
+    "listed": true
+  },
+  {
+    "id": "jpsushi",
+    "title": "Lunch tour",
+    "country": "Japan",
+    "type": "restaurant",
+    "name": "Sushi restaurant",
+    "dayCount": 3,
+    "date": null,
+    "optional": false,
+    "listed": true
+  },
+  {
+    "id": "frforest",
+    "title": "Green escape",
+    "country": "France",
+    "type": "national_park",
+    "name": "Forest",
+    "dayCount": 3,
+    "date": null,
+    "optional": false,
+    "listed": true
+  },
+  {
+    "id": "waterfall",
+    "title": "River escape",
+    "country": "Thailand",
+    "type": "tourist_attraction",
+    "name": "Waterfall",
+    "dayCount": 3,
+    "date": null,
+    "optional": false,
+    "listed": true
+  },
+  {
+    "id": "food",
+    "title": "Food discoveries",
+    "country": "Thailand",
+    "type": "restaurant",
+    "name": "Restaurant",
+    "dayCount": 3,
+    "date": null,
+    "optional": false,
+    "listed": true
+  },
+  {
+    "id": "optional",
+    "title": "Extra ideas",
+    "country": "Thailand",
+    "type": "national_park",
+    "name": "Forest",
+    "dayCount": 3,
+    "date": null,
+    "optional": true,
+    "listed": true
+  },
+  {
+    "id": "festival",
+    "title": "Lantern festival",
+    "country": "Thailand",
+    "type": "tourist_attraction",
+    "name": "Town square",
+    "dayCount": 3,
+    "date": null,
+    "optional": false,
+    "listed": true
+  },
+  {
+    "id": "private",
+    "title": "Hidden forest",
+    "country": "Thailand",
+    "type": "national_park",
+    "name": "Forest",
+    "dayCount": 3,
+    "date": null,
+    "optional": false,
+    "listed": false
+  },
+  {
+    "id": "both",
+    "title": "Mountain garden walk",
+    "country": "Thailand",
+    "type": "botanical_garden",
+    "name": "Mountain garden",
+    "dayCount": 3,
+    "date": null,
+    "optional": false,
+    "listed": true
+  },
+  {
+    "id": "jpbeach",
+    "title": "Island coast",
+    "country": "Japan",
+    "type": "beach",
+    "name": "Beach",
+    "dayCount": 3,
+    "date": null,
+    "optional": false,
+    "listed": true
+  }
+]

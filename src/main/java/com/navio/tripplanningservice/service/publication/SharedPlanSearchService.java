@@ -20,7 +20,9 @@ public class SharedPlanSearchService {
     private final ObjectMapper mapper;
     private final ExplorePlanSummarizer summarizer;
     private final SharedPlanCopyRepository copies;
-    private static final Map<String,String> COUNTRIES=new TreeMap<>(),CODES=new HashMap<>();
+    static final Map<String,String> COUNTRIES=new TreeMap<>(),CODES=new HashMap<>();
+    @org.springframework.beans.factory.annotation.Value("${navio.search.smart-enabled:true}")
+    private boolean smartEnabled=true;
     static {
         for(String code:Locale.getISOCountries()) {String name=Locale.of("",code).getDisplayCountry(Locale.ENGLISH);COUNTRIES.put(code,name);CODES.put(normal(name),code);CODES.put(normal(code),code);}
         for(String alias:List.of("usa","u s","u s a","united states of america"))CODES.put(alias,"US");
@@ -33,16 +35,16 @@ public class SharedPlanSearchService {
     public record SearchPage(List<ExplorePlanSummary> content,List<ExplorePlanSummary> recommendations,List<Destination> destinations,
         List<ExplorePlanSummary> plans,int number,boolean last,long totalElements,long matchedCount,
         List<ExplorePlanSummary> matching,List<ExplorePlanSummary> related,long matchingTotal,long relatedTotal,
-        boolean matchingLast,boolean relatedLast,List<ExplorePlanSummary> relatedPlans,Map<String,String> reasons,String correction,List<QuerySuggestion> querySuggestions,String notice) {
+        boolean matchingLast,boolean relatedLast,List<ExplorePlanSummary> relatedPlans,Map<String,String> reasons,String correction,List<QuerySuggestion> querySuggestions,String notice,SearchAssist searchAssist) {
         public SearchPage(List<ExplorePlanSummary> content,List<ExplorePlanSummary> recommendations,List<Destination> destinations,List<ExplorePlanSummary> plans,int number,boolean last,long totalElements,long matchedCount){
-            this(content,recommendations,destinations,plans,number,last,totalElements,matchedCount,Stream.concat(recommendations.stream(),content.stream()).toList(),List.of(),matchedCount,0,last,true,List.of(),Map.of(),null,List.of(),null);
+            this(content,recommendations,destinations,plans,number,last,totalElements,matchedCount,Stream.concat(recommendations.stream(),content.stream()).toList(),List.of(),matchedCount,0,last,true,List.of(),Map.of(),null,List.of(),null,null);
         }
     }
     private record Candidate(TripPublication row,PublicPlanSnapshot plan,PlanSearchQuery.Match match) {}
     public static String normal(String value){return Normalizer.normalize(value==null?"":value,Normalizer.Form.NFD).replaceAll("\\p{M}+","").toLowerCase(Locale.ROOT).replaceAll("[^\\p{L}\\p{N}]+"," ").trim().replaceAll(" +"," ");}
-    private static String code(String value){return CODES.getOrDefault(normal(value),"");}
+    static String code(String value){return CODES.getOrDefault(normal(value),"");}
     private static <T> List<T> safe(List<T> values){return values==null?List.of():values;}
-    private PublicPlanSnapshot read(TripPublication row) {
+    PublicPlanSnapshot read(TripPublication row) {
         if(!row.isListed()||row.getStatus()!=TripPublication.PublicationStatus.ACTIVE||row.getToken()==null||row.getSanitizerVersion()==null||row.getSanitizerVersion()<PlanPublicationSanitizer.SANITIZER_VERSION)return null;
         try {var plan=PublicPlanDates.read(mapper,row.getSnapshot());return plan!=null&&plan.sanitizerVersion()>=PlanPublicationSanitizer.SANITIZER_VERSION?plan:null;}catch(Exception unreadable){return null;}
     }
@@ -89,6 +91,10 @@ public class SharedPlanSearchService {
     }
     private static <T> List<T> window(List<T> values,int from,int size){int start=Math.min(values.size(),from);return List.copyOf(values.subList(start,Math.min(values.size(),start+size)));}
     public SearchPage search(String term,String country,Integer days,int page,int size,String sort){
+        if(smartEnabled)return new SmartPlanSearchEngine(this,repository,summarizer,copies).search(term,country,days,page,size,sort);
+        return searchLegacy(term,country,days,page,size,sort);
+    }
+    private SearchPage searchLegacy(String term,String country,Integer days,int page,int size,String sort){
         term=term==null?"":term.strip();country=country==null?"":country.toUpperCase(Locale.ROOT);
         if(term.length()>100||(!country.isEmpty()&&!COUNTRIES.containsKey(country))||days!=null&&(days<1||days>36500)||page<0||page>500||size<1||size>48||!Set.of("relevance","recent","trending").contains(sort))throw new IllegalArgumentException("Invalid search parameters");
         final String text=term,selected=country,normalized=normal(term);
@@ -158,6 +164,6 @@ public class SharedPlanSearchService {
         var destinationList=destinations.values().stream().sorted(Comparator.comparingLong(Destination::count).reversed().thenComparing(Destination::label).thenComparing(Destination::id)).limit(6).toList();
         boolean matchingLast=(long)(page+1)*size>=matchingTotal,relatedLast=(long)(page+1)*size>=relatedTotal;
         return new SearchPage(window(ranked,recommended+page*size,size).stream().map(summary).toList(),page==0?window(ranked,0,recommended).stream().map(summary).toList():List.of(),destinationList,suggestions,page,(long)(page+1)*size>=matchingTotal-recommended,matchingTotal-recommended,matchingTotal,
-            matching,relatedPage,matchingTotal,relatedTotal,matchingLast,relatedLast,relatedSuggestions,Map.copyOf(reasons),query.correction,phraseCandidates.stream().sorted(Comparator.comparingInt((String p)->normal(p).startsWith(normalized)?0:1).thenComparing(String::length).thenComparing(Function.identity())).limit(4).map(p->new QuerySuggestion(p,"catalogue")).toList(),query.temporal.yearRequested()?"Published trip dates show month and day only; a travel year cannot be verified.":null);
+            matching,relatedPage,matchingTotal,relatedTotal,matchingLast,relatedLast,relatedSuggestions,Map.copyOf(reasons),query.correction,phraseCandidates.stream().sorted(Comparator.comparingInt((String p)->normal(p).startsWith(normalized)?0:1).thenComparing(String::length).thenComparing(Function.identity())).limit(4).map(p->new QuerySuggestion(p,"catalogue")).toList(),query.temporal.yearRequested()?"Published trip dates show month and day only; a travel year cannot be verified.":null,null);
     }
 }

@@ -99,7 +99,9 @@ class SharedPlanSearchServiceTests {
   rows(row("us","Paris walks","Paris","United States",4),row("fr","Paris walks","Paris","France",4),row("jp","Food tour","Tokyo","Japan",4));
   assertThat(service.search("Paris France","",null,0,12,"relevance").matching()).extracting(p->p.token()).containsExactly("fr");
   assertThat(service.search("Paris","FR",null,0,12,"relevance").matching()).extracting(p->p.token()).containsExactly("fr");
-  assertThat(service.search("Paris","",null,0,12,"relevance").matching()).extracting(p->p.token()).containsExactlyInAnyOrder("fr","us");
+  // Smart interpretation must not silently choose between two genuinely ambiguous destinations.
+  assertThat(service.search("Paris","",null,0,12,"relevance").matching()).isEmpty();
+  assertThat(service.search("Paris","",null,0,12,"relevance").notice()).contains("Select a country");
   assertThat(service.search("Paris food trip","",null,0,12,"relevance").related()).extracting(p->p.token()).doesNotContain("jp");
  }
  @Test void legacyClientsDoNotPageThroughRelatedOnlyResults(){

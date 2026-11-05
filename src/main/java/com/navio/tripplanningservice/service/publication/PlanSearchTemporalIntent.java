@@ -5,19 +5,25 @@ import java.time.MonthDay;
 import java.util.*;
 
 /** Fixed calendar evidence only; no private year, hemisphere assumptions or inferred movable holidays. */
-record PlanSearchTemporalIntent(Set<Integer> months, boolean christmas, boolean newYear, boolean yearRequested) {
+record PlanSearchTemporalIntent(Set<Integer> months, boolean christmas, boolean newYear, boolean yearRequested,Set<MonthDay> calendarDays,boolean invalidDate) {
     static PlanSearchTemporalIntent parse(String text) {
-        var months=new HashSet<Integer>();
-        for(Month month:Month.values()) if(PlanSearchQuery.phrase(text,month.name()))months.add(month.getValue());
-        return new PlanSearchTemporalIntent(Set.copyOf(months),PlanSearchQuery.phrase(text,"christmas")||PlanSearchQuery.phrase(text,"xmas"),PlanSearchQuery.phrase(text,"new year"),text.matches(".*\\b(?:19|20|21)\\d{2}\\b.*"));
+        var months=new HashSet<Integer>();var calendar=new HashSet<MonthDay>();boolean invalid=false;
+        for(Month month:Month.values())for(String name:names(month)) {
+            if(PlanSearchQuery.phrase(text,name))months.add(month.getValue());
+            var day=java.util.regex.Pattern.compile("\\b(?:"+name+"\\s+(\\d{1,2})(?!\\d)|(\\d{1,2})\\s+"+name+")\\b").matcher(text);
+            while(day.find())try{calendar.add(MonthDay.of(month.getValue(),Integer.parseInt(day.group(1)!=null?day.group(1):day.group(2))));}catch(java.time.DateTimeException malformed){invalid=true;}
+        }
+        return new PlanSearchTemporalIntent(Set.copyOf(months),PlanSearchQuery.phrase(text,"christmas")||PlanSearchQuery.phrase(text,"xmas"),PlanSearchQuery.phrase(text,"new year"),text.matches(".*\\b(?:19|20|21)\\d{2}\\b.*"),Set.copyOf(calendar),invalid);
     }
     String remove(String text) {
-        for(Month month:Month.values())text=text.replaceAll("\\b"+month.name().toLowerCase(Locale.ROOT)+"\\b"," ");
+        for(Month month:Month.values())for(String name:names(month))text=text.replaceAll("\\b(?:"+name+"\\s+\\d{1,2}(?!\\d)|\\d{1,2}\\s+"+name+")\\b"," ").replaceAll("\\b"+name+"\\b"," ");
         return text.replaceAll("\\b(?:christmas|xmas|new year)\\b"," ").replaceAll("\\b(?:19|20|21)\\d{2}\\b"," ");
     }
     record Fit(boolean eligible,boolean direct,int score,String reason) {}
     Fit match(String text,List<MonthDay> dates) {
+        if(invalidDate)return new Fit(false,false,0,"Invalid calendar date");
         if(yearRequested)return new Fit(false,false,0,"Published travel dates do not include a year");
+        if(!calendarDays.isEmpty()&&!dates.containsAll(calendarDays))return new Fit(false,false,0,"");
         if(!months.isEmpty()&&!months.stream().allMatch(m->dates.isEmpty()?PlanSearchQuery.phrase(text,Month.of(m).name()):dates.stream().anyMatch(d->d.getMonthValue()==m)))return new Fit(false,false,0,"");
         boolean christmasText=PlanSearchQuery.phrase(text,"christmas")||PlanSearchQuery.phrase(text,"xmas");
         boolean newYearText=PlanSearchQuery.phrase(text,"new year");
@@ -31,4 +37,5 @@ record PlanSearchTemporalIntent(Set<Integer> months, boolean christmas, boolean 
         String reason=!direct?(christmas?"Public trip dates in December":"Public trip dates around New Year"):"";
         return new Fit(true,direct,proximity,reason);
     }
+    private static Set<String> names(Month month){var names=new HashSet<String>();names.add(month.name().toLowerCase(Locale.ROOT));names.add(month.getDisplayName(java.time.format.TextStyle.SHORT,Locale.ENGLISH).toLowerCase(Locale.ROOT));if(month==Month.SEPTEMBER)names.add("sept");return names;}
 }

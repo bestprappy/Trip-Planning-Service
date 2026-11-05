@@ -1,0 +1,538 @@
+[
+  {
+    "id": "0-5",
+    "query": "my Thailand Christmas Holiday trip",
+    "matching": [
+      "christmas"
+    ],
+    "relevant": [
+      "dec25",
+      "dec3"
+    ]
+  },
+  {
+    "id": "0-6",
+    "query": "Thailand Christmas Holiday please",
+    "matching": [
+      "christmas"
+    ],
+    "relevant": [
+      "dec25",
+      "dec3"
+    ]
+  },
+  {
+    "id": "0-7",
+    "query": "Thailand Christmas Holiday vacation",
+    "matching": [
+      "christmas"
+    ],
+    "relevant": [
+      "dec25",
+      "dec3"
+    ]
+  },
+  {
+    "id": "1-5",
+    "query": "my Thailand Christmas Festival trip",
+    "matching": [
+      "christmas"
+    ],
+    "relevant": []
+  },
+  {
+    "id": "1-6",
+    "query": "Thailand Christmas Festival please",
+    "matching": [
+      "christmas"
+    ],
+    "relevant": []
+  },
+  {
+    "id": "1-7",
+    "query": "Thailand Christmas Festival vacation",
+    "matching": [
+      "christmas"
+    ],
+    "relevant": []
+  },
+  {
+    "id": "2-5",
+    "query": "my Christmas Weekend in Thailand trip",
+    "matching": [],
+    "relevant": []
+  },
+  {
+    "id": "2-6",
+    "query": "Christmas Weekend in Thailand please",
+    "matching": [],
+    "relevant": []
+  },
+  {
+    "id": "2-7",
+    "query": "Christmas Weekend in Thailand vacation",
+    "matching": [],
+    "relevant": []
+  },
+  {
+    "id": "3-5",
+    "query": "my Thailand Christmas 2026 trip",
+    "matching": [],
+    "relevant": []
+  },
+  {
+    "id": "3-6",
+    "query": "Thailand Christmas 2026 please",
+    "matching": [],
+    "relevant": []
+  },
+  {
+    "id": "3-7",
+    "query": "Thailand Christmas 2026 vacation",
+    "matching": [],
+    "relevant": []
+  },
+  {
+    "id": "4-5",
+    "query": "my Thailand mountains trip",
+    "matching": [
+      "mountain",
+      "weekend",
+      "both"
+    ],
+    "relevant": []
+  },
+  {
+    "id": "4-6",
+    "query": "Thailand mountains please",
+    "matching": [
+      "mountain",
+      "weekend",
+      "both"
+    ],
+    "relevant": []
+  },
+  {
+    "id": "4-7",
+    "query": "Thailand mountains vacation",
+    "matching": [
+      "mountain",
+      "weekend",
+      "both"
+    ],
+    "relevant": []
+  },
+  {
+    "id": "5-5",
+    "query": "my Thailand forests trip",
+    "matching": [
+      "forest"
+    ],
+    "relevant": [
+      "optional"
+    ]
+  },
+  {
+    "id": "5-6",
+    "query": "Thailand forests please",
+    "matching": [
+      "forest"
+    ],
+    "relevant": [
+      "optional"
+    ]
+  },
+  {
+    "id": "5-7",
+    "query": "Thailand forests vacation",
+    "matching": [
+      "forest"
+    ],
+    "relevant": [
+      "optional"
+    ]
+  },
+  {
+    "id": "6-5",
+    "query": "my Thailand gardens trip",
+    "matching": [
+      "garden",
+      "both"
+    ],
+    "relevant": []
+  },
+  {
+    "id": "6-6",
+    "query": "Thailand gardens please",
+    "matching": [
+      "garden",
+      "both"
+    ],
+    "relevant": []
+  },
+  {
+    "id": "6-7",
+    "query": "Thailand gardens vacation",
+    "matching": [
+      "garden",
+      "both"
+    ],
+    "relevant": []
+  },
+  {
+    "id": "7-5",
+    "query": "my Scenic Thailand focus nature like gardens forests mountains trip",
+    "matching": [
+      "mountain",
+      "forest",
+      "garden",
+      "beach",
+      "weekend",
+      "waterfall",
+      "both"
+    ],
+    "relevant": [
+      "optional"
+    ]
+  },
+  {
+    "id": "7-6",
+    "query": "Scenic Thailand focus nature like gardens forests mountains please",
+    "matching": [
+      "mountain",
+      "forest",
+      "garden",
+      "beach",
+      "weekend",
+      "waterfall",
+      "both"
+    ],
+    "relevant": [
+      "optional"
+    ]
+  },
+  {
+    "id": "7-7",
+    "query": "Scenic Thailand focus nature like gardens forests mountains vacation",
+    "matching": [
+      "mountain",
+      "forest",
+      "garden",
+      "beach",
+      "weekend",
+      "waterfall",
+      "both"
+    ],
+    "relevant": [
+      "optional"
+    ]
+  },
+  {
+    "id": "8-5",
+    "query": "my Thailand mountains or gardens trip",
+    "matching": [
+      "mountain",
+      "garden",
+      "weekend",
+      "both"
+    ],
+    "relevant": []
+  },
+  {
+    "id": "8-6",
+    "query": "Thailand mountains or gardens please",
+    "matching": [
+      "mountain",
+      "garden",
+      "weekend",
+      "both"
+    ],
+    "relevant": []
+  },
+  {
+    "id": "8-7",
+    "query": "Thailand mountains or gardens vacation",
+    "matching": [
+      "mountain",
+      "garden",
+      "weekend",
+      "both"
+    ],
+    "relevant": []
+  },
+  {
+    "id": "9-5",
+    "query": "my Thailand mountains and gardens trip",
+    "matching": [
+      "both"
+    ],
+    "relevant": []
+  },
+  {
+    "id": "9-6",
+    "query": "Thailand mountains and gardens please",
+    "matching": [
+      "both"
+    ],
+    "relevant": []
+  },
+  {
+    "id": "9-7",
+    "query": "Thailand mountains and gardens vacation",
+    "matching": [
+      "both"
+    ],
+    "relevant": []
+  },
+  {
+    "id": "10-5",
+    "query": "my Thailand sushi trip",
+    "matching": [
+      "sushi"
+    ],
+    "relevant": []
+  },
+  {
+    "id": "10-6",
+    "query": "Thailand sushi please",
+    "matching": [
+      "sushi"
+    ],
+    "relevant": []
+  },
+  {
+    "id": "10-7",
+    "query": "Thailand sushi vacation",
+    "matching": [
+      "sushi"
+    ],
+    "relevant": []
+  },
+  {
+    "id": "11-5",
+    "query": "my Thailand food trip",
+    "matching": [
+      "sushi",
+      "food"
+    ],
+    "relevant": []
+  },
+  {
+    "id": "11-6",
+    "query": "Thailand food please",
+    "matching": [
+      "sushi",
+      "food"
+    ],
+    "relevant": []
+  },
+  {
+    "id": "11-7",
+    "query": "Thailand food vacation",
+    "matching": [
+      "sushi",
+      "food"
+    ],
+    "relevant": []
+  },
+  {
+    "id": "12-5",
+    "query": "my Thailand museums trip",
+    "matching": [
+      "dec25",
+      "dec3"
+    ],
+    "relevant": []
+  },
+  {
+    "id": "12-6",
+    "query": "Thailand museums please",
+    "matching": [
+      "dec25",
+      "dec3"
+    ],
+    "relevant": []
+  },
+  {
+    "id": "13-5",
+    "query": "my Japan sushi trip",
+    "matching": [
+      "jpsushi"
+    ],
+    "relevant": []
+  },
+  {
+    "id": "13-6",
+    "query": "Japan sushi please",
+    "matching": [
+      "jpsushi"
+    ],
+    "relevant": []
+  },
+  {
+    "id": "14-5",
+    "query": "my Japan mountains trip",
+    "matching": [
+      "jpmountain"
+    ],
+    "relevant": []
+  },
+  {
+    "id": "14-6",
+    "query": "Japan mountains please",
+    "matching": [
+      "jpmountain"
+    ],
+    "relevant": []
+  },
+  {
+    "id": "15-5",
+    "query": "my France forests trip",
+    "matching": [
+      "frforest"
+    ],
+    "relevant": []
+  },
+  {
+    "id": "15-6",
+    "query": "France forests please",
+    "matching": [
+      "frforest"
+    ],
+    "relevant": []
+  },
+  {
+    "id": "16-5",
+    "query": "my Thailand weekend trip",
+    "matching": [
+      "weekend"
+    ],
+    "relevant": []
+  },
+  {
+    "id": "16-6",
+    "query": "Thailand weekend please",
+    "matching": [
+      "weekend"
+    ],
+    "relevant": []
+  },
+  {
+    "id": "17-5",
+    "query": "my Thailand forests without beaches trip",
+    "matching": [
+      "forest"
+    ],
+    "relevant": [
+      "optional"
+    ]
+  },
+  {
+    "id": "17-6",
+    "query": "Thailand forests without beaches please",
+    "matching": [
+      "forest"
+    ],
+    "relevant": [
+      "optional"
+    ]
+  },
+  {
+    "id": "18-5",
+    "query": "my Thailand public holiday trip",
+    "matching": [],
+    "relevant": []
+  },
+  {
+    "id": "18-6",
+    "query": "Thailand public holiday please",
+    "matching": [],
+    "relevant": []
+  },
+  {
+    "id": "19-5",
+    "query": "my Thailand winter trip",
+    "matching": [],
+    "relevant": []
+  },
+  {
+    "id": "19-6",
+    "query": "Thailand winter please",
+    "matching": [],
+    "relevant": []
+  },
+  {
+    "id": "20-5",
+    "query": "my Thailand 4 days trip",
+    "matching": [],
+    "relevant": []
+  },
+  {
+    "id": "20-6",
+    "query": "Thailand 4 days please",
+    "matching": [],
+    "relevant": []
+  },
+  {
+    "id": "21-5",
+    "query": "my Thailand lunarviolet trip",
+    "matching": [],
+    "relevant": []
+  },
+  {
+    "id": "21-6",
+    "query": "Thailand lunarviolet please",
+    "matching": [],
+    "relevant": []
+  },
+  {
+    "id": "22-5",
+    "query": "my Thailand mountains without gardens trip",
+    "matching": [
+      "mountain",
+      "weekend"
+    ],
+    "relevant": []
+  },
+  {
+    "id": "22-6",
+    "query": "Thailand mountains without gardens please",
+    "matching": [
+      "mountain",
+      "weekend"
+    ],
+    "relevant": []
+  },
+  {
+    "id": "23-5",
+    "query": "my Thailand nature prefer gardens trip",
+    "matching": [
+      "mountain",
+      "forest",
+      "garden",
+      "beach",
+      "weekend",
+      "waterfall",
+      "both"
+    ],
+    "relevant": [
+      "optional"
+    ]
+  },
+  {
+    "id": "23-6",
+    "query": "Thailand nature prefer gardens please",
+    "matching": [
+      "mountain",
+      "forest",
+      "garden",
+      "beach",
+      "weekend",
+      "waterfall",
+      "both"
+    ],
+    "relevant": [
+      "optional"
+    ]
+  }
+]
