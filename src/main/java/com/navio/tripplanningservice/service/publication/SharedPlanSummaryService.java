@@ -53,7 +53,7 @@ public class SharedPlanSummaryService {
 
     private ExplorePlanSummary summarize(String token,boolean listedOnly) {
         var publication=load(token,listedOnly);
-        return summarizer.summarize(publication.getToken(),snapshot(publication),publication.getAuthorDisplayName(),publication.getListedAt(),publication.getUpdatedAt());
+        return summarizer.summarize(publication.getToken(),snapshot(publication),publication.getAuthorDisplayName(),publication.getListedAt(),publication.getUpdatedAt()).withFeedback(publication);
     }
     private TripPublication load(String token,boolean listedOnly) {
         if (token == null || token.isBlank()) {

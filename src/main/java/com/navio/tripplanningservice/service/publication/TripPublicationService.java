@@ -263,7 +263,7 @@ public class TripPublicationService {
                 summaries.add(summarizer.summarize(
                         row.getToken(), plan, row.getAuthorDisplayName(), row.getListedAt(), row.getUpdatedAt(),
                         row.getViewCount() == null ? 0 : row.getViewCount(),
-                        counts.getOrDefault(row.getId(), com.navio.tripplanningservice.repository.SharedPlanCopyRepository.CopyStats.ZERO).copies()));
+                        counts.getOrDefault(row.getId(), com.navio.tripplanningservice.repository.SharedPlanCopyRepository.CopyStats.ZERO).copies()).withFeedback(row));
             } catch (com.fasterxml.jackson.core.JsonProcessingException exception) {
                 log.error("Stored snapshot for publication {} is unreadable; left out of Explore",
                         row.getId(), exception);
@@ -366,7 +366,7 @@ public class TripPublicationService {
                     com.navio.tripplanningservice.repository.SharedPlanCopyRepository.CopyStats.ZERO);
         long views = publication.getViewCount() == null ? 0 : publication.getViewCount();
         return new com.navio.tripplanningservice.dto.publication.PlanEngagement(
-                views + (includeCurrentView ? 1 : 0), stats.copies(), stats.travelers());
+                views + (includeCurrentView ? 1 : 0), stats.copies(), stats.travelers(), publication.getRatingCount()==null||publication.getRatingCount()==0?null:(double)publication.getRatingSum()/publication.getRatingCount(), publication.getRatingCount()==null?0:publication.getRatingCount(), publication.getCommentCount()==null?0:publication.getCommentCount());
     }
 
     private PlannerItemDto copyPublishedItem(PublicItemDto item) {

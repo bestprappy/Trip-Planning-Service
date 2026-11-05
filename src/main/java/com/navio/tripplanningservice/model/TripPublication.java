@@ -36,6 +36,17 @@ import java.util.UUID;
 @Builder
 public class TripPublication {
 
+    /** SQL feedback transactions maintain these; snapshot updates must not overwrite them. */
+    @Builder.Default
+    @Column(nullable=false, insertable=false, updatable=false)
+    private Long ratingCount=0L;
+    @Builder.Default
+    @Column(nullable=false, insertable=false, updatable=false)
+    private Long ratingSum=0L;
+    @Builder.Default
+    @Column(nullable=false, insertable=false, updatable=false)
+    private Long commentCount=0L;
+
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;

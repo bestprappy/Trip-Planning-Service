@@ -37,8 +37,24 @@ public record ExplorePlanSummary(
         Instant updatedAt,
         String coverPlaceId,
         long viewCount,
-        long copyCount
+        long copyCount,
+        Double ratingAverage,
+        long ratingCount,
+        long commentCount
 ) {
+    public ExplorePlanSummary(String token,String title,String authorName,String destinationCity,String destinationCountry,
+            int dayCount,int placeCount,int chargerCount,String coverImageUrl,List<String> highlights,List<ExploreDayShape> days,
+            Instant listedAt,Instant updatedAt,String coverPlaceId,long viewCount,long copyCount) {
+        this(token,title,authorName,destinationCity,destinationCountry,dayCount,placeCount,chargerCount,coverImageUrl,
+            highlights,days,listedAt,updatedAt,coverPlaceId,viewCount,copyCount,null,0,0);
+    }
+    public ExplorePlanSummary withFeedback(com.navio.tripplanningservice.model.TripPublication publication) {
+        long count=publication.getRatingCount()==null?0:publication.getRatingCount();
+        long sum=publication.getRatingSum()==null?0:publication.getRatingSum();
+        return new ExplorePlanSummary(token,title,authorName,destinationCity,destinationCountry,dayCount,placeCount,
+            chargerCount,coverImageUrl,highlights,days,listedAt,updatedAt,coverPlaceId,viewCount,copyCount,
+            count==0?null:(double)sum/count,count,publication.getCommentCount()==null?0:publication.getCommentCount());
+    }
     public ExplorePlanSummary(String token, String title, String authorName, String destinationCity,
             String destinationCountry, int dayCount, int placeCount, int chargerCount,
             String coverImageUrl, List<String> highlights, List<ExploreDayShape> days,

@@ -30,6 +30,12 @@ import java.util.Map;
 @Slf4j
 public class GlobalExceptionHandler {
 
+    @ExceptionHandler(com.navio.tripplanningservice.service.publication.PlanFeedbackService.FeedbackException.class)
+    public ResponseEntity<ErrorResponse> handlePlanFeedback(com.navio.tripplanningservice.service.publication.PlanFeedbackService.FeedbackException ex) {
+        return ResponseEntity.status(ex.status()).body(ErrorResponse.builder().timestamp(Instant.now())
+            .status(ex.status()).message(ex.getMessage()).build());
+    }
+
     @ExceptionHandler(TripNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleTripNotFound(TripNotFoundException ex) {
         log.error("Trip not found: {}", ex.getMessage());

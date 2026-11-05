@@ -54,7 +54,7 @@ final class SmartPlanSearchEngine {
   var retained=new LinkedHashMap<UUID,Ranked>();int capacity=page*size+size+6;
   Stream.concat(window(matching,0,capacity).stream(),window(relevant,0,capacity).stream()).forEach(r->retained.put(r.entry().row().getId(),r));
   var copyStats=retained.isEmpty()?Map.<UUID,SharedPlanCopyRepository.CopyStats>of():copies.counts(new ArrayList<>(retained.keySet()));
-  Function<Ranked,ExplorePlanSummary> summary=r->{var e=r.entry();var p=e.parsed().plan();var row=e.row();return summarizer.summarize(row.getToken(),p,row.getAuthorDisplayName(),row.getListedAt(),row.getUpdatedAt(),Objects.requireNonNullElse(row.getViewCount(),0L),copyStats.getOrDefault(row.getId(),SharedPlanCopyRepository.CopyStats.ZERO).copies());};
+  Function<Ranked,ExplorePlanSummary> summary=r->{var e=r.entry();var p=e.parsed().plan();var row=e.row();return summarizer.summarize(row.getToken(),p,row.getAuthorDisplayName(),row.getListedAt(),row.getUpdatedAt(),Objects.requireNonNullElse(row.getViewCount(),0L),copyStats.getOrDefault(row.getId(),SharedPlanCopyRepository.CopyStats.ZERO).copies()).withFeedback(row);};
   int recommended=!term.isBlank()&&sort.equals("relevance")?Math.min(6,matching.size()):0;
   List<ExplorePlanSummary> strongPage=window(matching,page*size,size).stream().map(summary).toList(),weakPage=window(relevant,page*size,size).stream().map(summary).toList();
   var reasons=new LinkedHashMap<String,String>();Stream.concat(window(relevant,page*size,size).stream(),window(relevant,0,4).stream()).forEach(r->reasons.put(r.entry().row().getToken(),r.match().reason()));

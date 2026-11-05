@@ -155,7 +155,7 @@ public class SharedPlanSearchService {
         var ranked=strong.stream().sorted(order).toList();var broader=related.stream().sorted(order).toList();
         var retained=Stream.concat(ranked.stream(),broader.stream()).toList();
         var counts=retained.isEmpty()?Map.<UUID,SharedPlanCopyRepository.CopyStats>of():copies.counts(retained.stream().map(c->c.row().getId()).toList());
-        Function<Candidate,ExplorePlanSummary> summary=c->summarizer.summarize(c.row().getToken(),c.plan(),c.row().getAuthorDisplayName(),c.row().getListedAt(),c.row().getUpdatedAt(),Optional.ofNullable(c.row().getViewCount()).orElse(0L),counts.getOrDefault(c.row().getId(),SharedPlanCopyRepository.CopyStats.ZERO).copies());
+        Function<Candidate,ExplorePlanSummary> summary=c->summarizer.summarize(c.row().getToken(),c.plan(),c.row().getAuthorDisplayName(),c.row().getListedAt(),c.row().getUpdatedAt(),Optional.ofNullable(c.row().getViewCount()).orElse(0L),counts.getOrDefault(c.row().getId(),SharedPlanCopyRepository.CopyStats.ZERO).copies()).withFeedback(c.row());
         int recommended=!normalized.isBlank()&&"relevance".equals(sort)?Math.min(6,ranked.size()):0;
         var matching=window(ranked,page*size,size).stream().map(summary).toList();var relatedPage=window(broader,page*size,size).stream().map(summary).toList();
         var suggestions=normalized.length()>=2?window(ranked,0,4).stream().map(summary).toList():List.<ExplorePlanSummary>of();
