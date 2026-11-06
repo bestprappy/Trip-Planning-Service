@@ -13,11 +13,13 @@ record PlanSearchTemporalIntent(Set<Integer> months, boolean christmas, boolean 
             var day=java.util.regex.Pattern.compile("\\b(?:"+name+"\\s+(\\d{1,2})(?!\\d)|(\\d{1,2})\\s+"+name+")\\b").matcher(text);
             while(day.find())try{calendar.add(MonthDay.of(month.getValue(),Integer.parseInt(day.group(1)!=null?day.group(1):day.group(2))));}catch(java.time.DateTimeException malformed){invalid=true;}
         }
-        return new PlanSearchTemporalIntent(Set.copyOf(months),PlanSearchQuery.phrase(text,"christmas")||PlanSearchQuery.phrase(text,"xmas"),PlanSearchQuery.phrase(text,"new year"),text.matches(".*\\b(?:19|20|21)\\d{2}\\b.*"),Set.copyOf(calendar),invalid);
+        return new PlanSearchTemporalIntent(Set.copyOf(months),PlanSearchQuery.phrase(text,"christmas")||PlanSearchQuery.phrase(text,"xmas"),gregorianNewYear(text),text.matches(".*\\b(?:19|20|21)\\d{2}\\b.*"),Set.copyOf(calendar),invalid);
     }
+    private static boolean gregorianNewYear(String text){return PlanSearchQuery.phrase(text,"new year")&&!PlanSearchQuery.phrase(text,"chinese new year")&&!PlanSearchQuery.phrase(text,"lunar new year");}
     String remove(String text) {
         for(Month month:Month.values())for(String name:names(month))text=text.replaceAll("\\b(?:"+name+"\\s+\\d{1,2}(?!\\d)|\\d{1,2}\\s+"+name+")\\b"," ").replaceAll("\\b"+name+"\\b"," ");
-        return text.replaceAll("\\b(?:christmas|xmas|new year)\\b"," ").replaceAll("\\b(?:19|20|21)\\d{2}\\b"," ");
+        if(newYear)text=text.replaceAll("\\bnew year\\b"," ");
+        return text.replaceAll("\\b(?:christmas|xmas)\\b"," ").replaceAll("\\b(?:19|20|21)\\d{2}\\b"," ");
     }
     record Fit(boolean eligible,boolean direct,int score,String reason) {}
     Fit match(String text,List<MonthDay> dates) {
@@ -26,7 +28,7 @@ record PlanSearchTemporalIntent(Set<Integer> months, boolean christmas, boolean 
         if(!calendarDays.isEmpty()&&!dates.containsAll(calendarDays))return new Fit(false,false,0,"");
         if(!months.isEmpty()&&!months.stream().allMatch(m->dates.isEmpty()?PlanSearchQuery.phrase(text,Month.of(m).name()):dates.stream().anyMatch(d->d.getMonthValue()==m)))return new Fit(false,false,0,"");
         boolean christmasText=PlanSearchQuery.phrase(text,"christmas")||PlanSearchQuery.phrase(text,"xmas");
-        boolean newYearText=PlanSearchQuery.phrase(text,"new year");
+        boolean newYearText=gregorianNewYear(text);
         boolean december=dates.stream().anyMatch(d->d.getMonthValue()==12);
         boolean turn=dates.stream().anyMatch(d->d.getMonthValue()==12&&d.getDayOfMonth()>=26||d.getMonthValue()==1&&d.getDayOfMonth()<=7);
         if(christmas&&!christmasText&&!december||newYear&&!newYearText&&!turn)return new Fit(false,false,0,"");

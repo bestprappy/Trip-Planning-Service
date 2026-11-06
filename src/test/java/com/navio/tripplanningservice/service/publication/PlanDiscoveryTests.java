@@ -30,6 +30,24 @@ class PlanDiscoveryTests {
         assertTrue(PlanDiscovery.event(evidence("easter",Set.of(),MonthDay.of(3,28)),LocalDate.of(2027,3,1)));
         assertTrue(PlanDiscovery.seasonal(evidence("garden",Set.of(),MonthDay.of(2,29)),LocalDate.of(2027,2,1)));
     }
+    @Test void halloweenUsesOctoberWindowAndNotAnyAutumnTrip() {
+        var now=LocalDate.of(2026,10,12);
+        assertTrue(PlanDiscovery.event(evidence("edinburgh halloween",Set.of(),MonthDay.of(10,31)),now));
+        assertFalse(PlanDiscovery.event(evidence("edinburgh autumn",Set.of(),MonthDay.of(10,31)),now));
+        assertFalse(PlanDiscovery.event(evidence("halloween",Set.of(),MonthDay.of(7,31)),now));
+        assertFalse(PlanDiscovery.event(evidence("halloween",Set.of()),LocalDate.of(2026,11,6)));
+    }
+    @Test void lunarNewYearUsesVerifiedChangingDatesAndCannotMatchGregorianNewYear() {
+        assertTrue(PlanDiscovery.event(evidence("chinese new year",Set.of(),MonthDay.of(2,6)),LocalDate.of(2027,1,15)));
+        assertTrue(PlanDiscovery.event(evidence("lunar new year",Set.of(),MonthDay.of(1,26)),LocalDate.of(2028,1,10)));
+        assertFalse(PlanDiscovery.event(evidence("chinese new year",Set.of(),MonthDay.of(1,1)),LocalDate.of(2026,12,28)));
+        assertFalse(PlanDiscovery.event(evidence("lunar new year",Set.of()),LocalDate.of(2032,1,15)));
+    }
+    @Test void loyKrathongRequiresVerifiedOccurrenceAndExplicitPublicEvidence() {
+        assertTrue(PlanDiscovery.event(evidence("chiang mai loy krathong",Set.of(),MonthDay.of(11,24)),LocalDate.of(2026,11,6)));
+        assertFalse(PlanDiscovery.event(evidence("chiang mai temples",Set.of(),MonthDay.of(11,24)),LocalDate.of(2026,11,6)));
+        assertFalse(PlanDiscovery.event(evidence("loy krathong",Set.of()),LocalDate.of(2027,11,6)));
+    }
     @Test void collectionsOrThemesAndRejectUnknown() {
         var filters=PlanDiscovery.Filters.parse("seasonal,events","nature,ev");
         assertTrue(filters.accepts(evidence("forest",Set.of("nature"),MonthDay.of(11,2)),LocalDate.of(2026,11,5)));
