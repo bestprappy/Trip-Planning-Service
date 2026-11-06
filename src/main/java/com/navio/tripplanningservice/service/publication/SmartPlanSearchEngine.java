@@ -37,7 +37,8 @@ final class SmartPlanSearchEngine {
  }
  SearchPage search(String term,String country,Integer days,int page,int size,String sort,PlanDiscovery.Filters filters){
   term=Objects.toString(term,"").strip();country=Objects.toString(country,"").toUpperCase(Locale.ROOT);
-  if(term.codePointCount(0,term.length())>256||!country.isEmpty()&&!COUNTRIES.containsKey(country)||days!=null&&(days<1||days>36500)||page<0||page>500||size<1||size>48||!PlanDiscovery.SORTS.contains(sort))throw new IllegalArgumentException("Invalid search parameters");
+  if(term.codePointCount(0,term.length())>256||!country.isEmpty()&&!COUNTRIES.containsKey(country)||days!=null&&(days<1||days>36500)||page<0||page>500||size<1||size>48)throw new IllegalArgumentException("Invalid search parameters");
+  var priorities=PlanSortOrder.parse(sort);
   long began=System.nanoTime();var entries=new ArrayList<Entry>();
   try(Stream<TripPublication> stream=repository.streamListed(PlanPublicationSanitizer.SANITIZER_VERSION)){stream.forEach(row->{var parsed=parse(row);if(parsed!=null)entries.add(new Entry(row,parsed));});}
   var today=reader.discoveryToday();
@@ -51,12 +52,23 @@ final class SmartPlanSearchEngine {
   for(var entry:entries){var plan=entry.parsed().plan();String c=code(plan.destinationCountry());if(!c.isBlank()&&plan.destinationCity()!=null)locations.putIfAbsent(normal(plan.destinationCity())+":"+c,new PlanSearchQuery.Location(plan.destinationCity(),c,false));
    for(var day:Stream.concat(list(plan.days()).stream(),list(plan.lists()).stream()).filter(Objects::nonNull).toList())for(var item:list(day.items()))if(item!=null&&item.city()!=null){String placeCountry=c;if(item.address()!=null){String[] parts=item.address().split(",");String found=code(parts[parts.length-1]);if(!found.isBlank())placeCountry=found;}if(!placeCountry.isBlank())locations.putIfAbsent(normal(item.city())+":"+placeCountry,new PlanSearchQuery.Location(item.city(),placeCountry,false));}}
   String selected=country;var intent=SearchIntentParser.parse(term,locations.values(),country,days);
-  Comparator<Ranked> order=Comparator.comparingInt((Ranked r)->"relevance".equals(sort)?r.match().score():0).reversed();
-  if(sort.equals("trending"))order=order.thenComparing(Comparator.comparingLong((Ranked r)->activity.getOrDefault(r.entry().row().getId(),0L)).reversed());
-  if(sort.equals("popular"))order=order.thenComparing(Comparator.comparingLong((Ranked r)->allCopies.getOrDefault(r.entry().row().getId(),SharedPlanCopyRepository.CopyStats.ZERO).copies()).reversed());
-  if(sort.equals("popular")||sort.equals("views"))order=order.thenComparing(Comparator.comparingLong((Ranked r)->Objects.requireNonNullElse(r.entry().row().getViewCount(),0L)).reversed());
-  if(sort.equals("discussed"))order=order.thenComparing(Comparator.comparingLong((Ranked r)->Objects.requireNonNullElse(r.entry().row().getCommentCount(),0L)).reversed());
-  if(sort.equals("rating"))order=order.thenComparing(Comparator.comparingDouble((Ranked r)->r.entry().row().getRatingCount()==null||r.entry().row().getRatingCount()==0?-1:(double)r.entry().row().getRatingSum()/r.entry().row().getRatingCount()).reversed()).thenComparing(Comparator.comparingLong((Ranked r)->Objects.requireNonNullElse(r.entry().row().getRatingCount(),0L)).reversed());
+  Comparator<Ranked> order=(a,b)->0;
+  for(String priority:priorities){
+   Comparator<Ranked> metric=switch(priority){
+    case "relevance" -> Comparator.comparingInt((Ranked r)->r.match().score()).reversed();
+    case "recent" -> Comparator.comparing((Ranked r)->r.entry().row().getListedAt(),Comparator.nullsLast(Comparator.reverseOrder()));
+    case "trending" -> Comparator.comparingLong((Ranked r)->activity.getOrDefault(r.entry().row().getId(),0L)).reversed();
+    case "popular" -> Comparator.comparingLong((Ranked r)->allCopies.getOrDefault(r.entry().row().getId(),SharedPlanCopyRepository.CopyStats.ZERO).copies()).reversed();
+    case "views" -> Comparator.comparingLong((Ranked r)->Objects.requireNonNullElse(r.entry().row().getViewCount(),0L)).reversed();
+    case "discussed" -> Comparator.comparingLong((Ranked r)->Objects.requireNonNullElse(r.entry().row().getCommentCount(),0L)).reversed();
+    case "rating" -> Comparator.comparingDouble((Ranked r)->r.entry().row().getRatingCount()==null||r.entry().row().getRatingCount()==0?-1:(double)r.entry().row().getRatingSum()/r.entry().row().getRatingCount()).reversed();
+    default -> throw new IllegalArgumentException("Invalid sorting priorities");
+   };
+   order=order.thenComparing(metric);
+  }
+  // Explicit secondary priorities must precede the legacy intrinsic tie-breakers.
+  if(priorities.contains("rating"))order=order.thenComparing(Comparator.comparingLong((Ranked r)->Objects.requireNonNullElse(r.entry().row().getRatingCount(),0L)).reversed());
+  if(priorities.contains("popular")&&!priorities.contains("views"))order=order.thenComparing(Comparator.comparingLong((Ranked r)->Objects.requireNonNullElse(r.entry().row().getViewCount(),0L)).reversed());
   if(filters.collections().contains("events"))order=order.thenComparingLong(r->PlanDiscovery.eventProximity(r.entry().parsed().evidence(),today));
   order=order.thenComparing(r->r.entry().row().getListedAt(),Comparator.nullsLast(Comparator.reverseOrder())).thenComparing(r->r.entry().row().getToken());
   var matching=new ArrayList<Ranked>();var relevant=new ArrayList<Ranked>();
