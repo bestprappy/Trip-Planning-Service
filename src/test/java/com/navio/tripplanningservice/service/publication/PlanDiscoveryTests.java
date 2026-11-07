@@ -64,7 +64,9 @@ class PlanDiscoveryTests {
         assertEquals("b",f.service.search("","TH",null,0,6,"rating").matching().getFirst().token());
         assertEquals("b",f.service.search("","TH",null,0,6,"popular").matching().getFirst().token());
         assertEquals("a",f.service.search("","TH",null,0,6,"views").matching().getFirst().token());
-        // Lifetime popularity does not fabricate recent activity.
-        assertTrue(f.service.search("","TH",null,0,6,"trending","trending","").matching().isEmpty());
+        // Lifetime popularity supplies honestly labelled fallback cards, never fabricated activity.
+        var discovery=f.service.search("","TH",null,0,6,"trending","trending","");
+        assertEquals(2,discovery.matchingTotal());
+        assertEquals(Map.of("a","popular","b","popular"),discovery.discoveryLabels());
     }
 }

@@ -44,7 +44,8 @@ final class SmartPlanSearchEngine {
   var today=reader.discoveryToday();
   var activity=reader.activityScores(today);
   var allCopies=entries.isEmpty()?Map.<UUID,SharedPlanCopyRepository.CopyStats>of():copies.counts(entries.stream().map(e->e.row().getId()).toList());
-  entries.removeIf(e->!filters.accepts(e.parsed().evidence(),today)||filters.collections().contains("trending")&&activity.getOrDefault(e.row().getId(),0L)==0);
+  boolean trendingCollection=filters.collections().contains("trending");
+  entries.removeIf(e->!filters.accepts(e.parsed().evidence(),today));
   var locations=new LinkedHashMap<String,PlanSearchQuery.Location>();COUNTRIES.forEach((code,name)->locations.put("country:"+code,new PlanSearchQuery.Location(name,code,true)));
   String normalizedTerm=normal(term);
   CODES.forEach((alias,code)->{if(alias.length()>2||Set.of("uk","us").contains(alias)||normalizedTerm.equals(alias))locations.putIfAbsent("alias:"+alias,new PlanSearchQuery.Location(alias,code,true));});
@@ -52,12 +53,20 @@ final class SmartPlanSearchEngine {
   for(var entry:entries){var plan=entry.parsed().plan();String c=code(plan.destinationCountry());if(!c.isBlank()&&plan.destinationCity()!=null)locations.putIfAbsent(normal(plan.destinationCity())+":"+c,new PlanSearchQuery.Location(plan.destinationCity(),c,false));
    for(var day:Stream.concat(list(plan.days()).stream(),list(plan.lists()).stream()).filter(Objects::nonNull).toList())for(var item:list(day.items()))if(item!=null&&item.city()!=null){String placeCountry=c;if(item.address()!=null){String[] parts=item.address().split(",");String found=code(parts[parts.length-1]);if(!found.isBlank())placeCountry=found;}if(!placeCountry.isBlank())locations.putIfAbsent(normal(item.city())+":"+placeCountry,new PlanSearchQuery.Location(item.city(),placeCountry,false));}}
   String selected=country;var intent=SearchIntentParser.parse(term,locations.values(),country,days);
-  Comparator<Ranked> order=(a,b)->0;
+  // Preserve recent-activity leaders; fallbacks never bypass the eligibility checks below.
+  Function<Ranked,Integer> tier=r->activity.getOrDefault(r.entry().row().getId(),0L)>0?0:
+      allCopies.getOrDefault(r.entry().row().getId(),SharedPlanCopyRepository.CopyStats.ZERO).copies()>0||Objects.requireNonNullElse(r.entry().row().getViewCount(),0L)>0?1:2;
+  Comparator<Ranked> order=trendingCollection?Comparator.comparingInt(tier::apply):(a,b)->0;
   for(String priority:priorities){
    Comparator<Ranked> metric=switch(priority){
     case "relevance" -> Comparator.comparingInt((Ranked r)->r.match().score()).reversed();
     case "recent" -> Comparator.comparing((Ranked r)->r.entry().row().getListedAt(),Comparator.nullsLast(Comparator.reverseOrder()));
-    case "trending" -> Comparator.comparingLong((Ranked r)->activity.getOrDefault(r.entry().row().getId(),0L)).reversed();
+    case "trending" -> {
+      Comparator<Ranked> activityOrder=Comparator.comparingLong((Ranked r)->activity.getOrDefault(r.entry().row().getId(),0L)).reversed();
+      if(trendingCollection&&priorities.size()==1)activityOrder=activityOrder.thenComparing(Comparator.comparingLong((Ranked r)->allCopies.getOrDefault(r.entry().row().getId(),SharedPlanCopyRepository.CopyStats.ZERO).copies()).reversed())
+          .thenComparing(Comparator.comparingLong((Ranked r)->Objects.requireNonNullElse(r.entry().row().getViewCount(),0L)).reversed());
+      yield activityOrder;
+    }
     case "popular" -> Comparator.comparingLong((Ranked r)->allCopies.getOrDefault(r.entry().row().getId(),SharedPlanCopyRepository.CopyStats.ZERO).copies()).reversed();
     case "views" -> Comparator.comparingLong((Ranked r)->Objects.requireNonNullElse(r.entry().row().getViewCount(),0L)).reversed();
     case "discussed" -> Comparator.comparingLong((Ranked r)->Objects.requireNonNullElse(r.entry().row().getCommentCount(),0L)).reversed();
@@ -81,6 +90,9 @@ final class SmartPlanSearchEngine {
   Function<Ranked,ExplorePlanSummary> summary=r->{var e=r.entry();var p=e.parsed().plan();var row=e.row();return summarizer.summarize(row.getToken(),p,row.getAuthorDisplayName(),row.getListedAt(),row.getUpdatedAt(),Objects.requireNonNullElse(row.getViewCount(),0L),copyStats.getOrDefault(row.getId(),SharedPlanCopyRepository.CopyStats.ZERO).copies()).withFeedback(row);};
   int recommended=!term.isBlank()&&sort.equals("relevance")?Math.min(6,matching.size()):0;
   List<ExplorePlanSummary> strongPage=window(matching,page*size,size).stream().map(summary).toList(),weakPage=window(relevant,page*size,size).stream().map(summary).toList();
+  var discoveryLabels=new LinkedHashMap<String,String>();
+  if(trendingCollection)Stream.concat(window(matching,page*size,size).stream(),window(relevant,page*size,size).stream())
+      .forEach(r->discoveryLabels.put(r.entry().row().getToken(),switch(tier.apply(r)){case 0->"trending";case 1->"popular";default->"recent";}));
   var reasons=new LinkedHashMap<String,String>();Stream.concat(window(relevant,page*size,size).stream(),window(relevant,0,4).stream()).forEach(r->reasons.put(r.entry().row().getToken(),r.match().reason()));
   var destinations=new LinkedHashMap<String,Destination>();String query=normal(term);
   for(var location:locations.values()){
@@ -90,7 +102,7 @@ final class SmartPlanSearchEngine {
    long count=entries.stream().filter(e->selected.isBlank()||e.parsed().evidence().countries().contains(selected)).filter(e->days==null||e.parsed().plan().dayCount()==days).filter(e->e.parsed().evidence().countries().contains(location.country())&&(location.countryLevel()||TravelConcepts.has(e.parsed().evidence().text(),name))).count();
    destinations.put(id,new Destination(id,location.countryLevel()?COUNTRIES.get(location.country()):location.name(),location.country(),location.countryLevel()?"country":"city",count));
   }
-  String revision=digest(today+"|"+filters.signature()+"|"+entries.stream().map(e->e.row().getId()+":"+e.row().getRevision()+":"+digest(e.row().getSnapshot())+(sort.equals("relevance")||sort.equals("recent")?"":":"+e.row().getViewCount()+":"+e.row().getRatingCount()+":"+e.row().getRatingSum()+":"+e.row().getCommentCount()+":"+allCopies.getOrDefault(e.row().getId(),SharedPlanCopyRepository.CopyStats.ZERO).copies()+":"+activity.getOrDefault(e.row().getId(),0L))).sorted().collect(java.util.stream.Collectors.joining("|")));
+  String revision=digest(today+"|"+filters.signature()+"|"+entries.stream().map(e->e.row().getId()+":"+e.row().getRevision()+":"+digest(e.row().getSnapshot())+(!trendingCollection&&(sort.equals("relevance")||sort.equals("recent"))?"":":"+e.row().getViewCount()+":"+e.row().getRatingCount()+":"+e.row().getRatingSum()+":"+e.row().getCommentCount()+":"+allCopies.getOrDefault(e.row().getId(),SharedPlanCopyRepository.CopyStats.ZERO).copies()+":"+activity.getOrDefault(e.row().getId(),0L))).sorted().collect(java.util.stream.Collectors.joining("|")));
   String fingerprint=digest(query+"|"+country+"|"+days+"|"+sort+"|"+filters.signature()+"|"+TravelConcepts.DATA.version());
   String interpretation=intent.required().isEmpty()?"":String.join(" and ",intent.required().stream().map(g->String.join(" or ",g.stream().sorted().map(TravelConcepts::label).toList())).toList());
   var assist=new SearchAssist(1,TravelConcepts.DATA.version(),term,country,days,sort,fingerprint,revision,256,interpretation,intent.notices(),suggestions,intent.blocked());
@@ -98,7 +110,7 @@ final class SmartPlanSearchEngine {
   String correction=PlanSearchQuery.parse(term,locations.values(),country).correction;
   boolean strongLast=(long)(page+1)*size>=matching.size(),weakLast=(long)(page+1)*size>=relevant.size();
   org.slf4j.LoggerFactory.getLogger(SmartPlanSearchEngine.class).debug("Public search completed: publications={}, elapsedMs={}",entries.size(),(System.nanoTime()-began)/1_000_000);
-  return new SearchPage(window(matching,recommended+page*size,size).stream().map(summary).toList(),page==0?window(matching,0,recommended).stream().map(summary).toList():List.of(),destinations.values().stream().sorted(Comparator.comparingLong(Destination::count).reversed().thenComparing(Destination::label)).limit(6).toList(),window(matching,0,4).stream().map(summary).toList(),page,(long)(page+1)*size>=matching.size()-recommended,matching.size()-recommended,matching.size(),strongPage,weakPage,matching.size(),relevant.size(),strongLast,weakLast,window(relevant,0,4).stream().map(summary).toList(),Map.copyOf(reasons),correction,querySuggestions,intent.notices().isEmpty()?null:String.join(" ",intent.notices()),assist);
+  return new SearchPage(window(matching,recommended+page*size,size).stream().map(summary).toList(),page==0?window(matching,0,recommended).stream().map(summary).toList():List.of(),destinations.values().stream().sorted(Comparator.comparingLong(Destination::count).reversed().thenComparing(Destination::label)).limit(6).toList(),window(matching,0,4).stream().map(summary).toList(),page,(long)(page+1)*size>=matching.size()-recommended,matching.size()-recommended,matching.size(),strongPage,weakPage,matching.size(),relevant.size(),strongLast,weakLast,window(relevant,0,4).stream().map(summary).toList(),Map.copyOf(reasons),correction,querySuggestions,intent.notices().isEmpty()?null:String.join(" ",intent.notices()),assist,Map.copyOf(discoveryLabels));
  }
  private static <T> List<T> list(List<T> value){return value==null?List.of():value;}
 }

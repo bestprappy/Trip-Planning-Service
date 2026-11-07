@@ -19,9 +19,9 @@ public class PublicationActivityRepository {
     public Map<UUID,Long> scores(LocalDate today){
         var result=new HashMap<UUID,Long>();
         jdbc.sql("""
-          SELECT publication_id,sum(views::numeric+3*copies::numeric) score
+          SELECT publication_id,sum((views::numeric+3*copies::numeric)*(30-(:today-activity_day))) score
           FROM trip.publication_daily_activity WHERE activity_day BETWEEN :first AND :today GROUP BY publication_id
-          """).param("first",today.minusDays(6)).param("today",today).query((rs,i)->{
+          """).param("first",today.minusDays(29)).param("today",today).query((rs,i)->{
               result.put(rs.getObject("publication_id",UUID.class),rs.getBigDecimal("score").min(java.math.BigDecimal.valueOf(Long.MAX_VALUE)).longValue());return 0;
           }).list();
         return Map.copyOf(result);

@@ -44,9 +44,9 @@ public class SharedPlanSearchService {
     public record SearchPage(List<ExplorePlanSummary> content,List<ExplorePlanSummary> recommendations,List<Destination> destinations,
         List<ExplorePlanSummary> plans,int number,boolean last,long totalElements,long matchedCount,
         List<ExplorePlanSummary> matching,List<ExplorePlanSummary> related,long matchingTotal,long relatedTotal,
-        boolean matchingLast,boolean relatedLast,List<ExplorePlanSummary> relatedPlans,Map<String,String> reasons,String correction,List<QuerySuggestion> querySuggestions,String notice,SearchAssist searchAssist) {
+        boolean matchingLast,boolean relatedLast,List<ExplorePlanSummary> relatedPlans,Map<String,String> reasons,String correction,List<QuerySuggestion> querySuggestions,String notice,SearchAssist searchAssist,Map<String,String> discoveryLabels) {
         public SearchPage(List<ExplorePlanSummary> content,List<ExplorePlanSummary> recommendations,List<Destination> destinations,List<ExplorePlanSummary> plans,int number,boolean last,long totalElements,long matchedCount){
-            this(content,recommendations,destinations,plans,number,last,totalElements,matchedCount,Stream.concat(recommendations.stream(),content.stream()).toList(),List.of(),matchedCount,0,last,true,List.of(),Map.of(),null,List.of(),null,null);
+            this(content,recommendations,destinations,plans,number,last,totalElements,matchedCount,Stream.concat(recommendations.stream(),content.stream()).toList(),List.of(),matchedCount,0,last,true,List.of(),Map.of(),null,List.of(),null,null,Map.of());
         }
     }
     private record Candidate(TripPublication row,PublicPlanSnapshot plan,PlanSearchQuery.Match match) {}
@@ -173,6 +173,6 @@ public class SharedPlanSearchService {
         var destinationList=destinations.values().stream().sorted(Comparator.comparingLong(Destination::count).reversed().thenComparing(Destination::label).thenComparing(Destination::id)).limit(6).toList();
         boolean matchingLast=(long)(page+1)*size>=matchingTotal,relatedLast=(long)(page+1)*size>=relatedTotal;
         return new SearchPage(window(ranked,recommended+page*size,size).stream().map(summary).toList(),page==0?window(ranked,0,recommended).stream().map(summary).toList():List.of(),destinationList,suggestions,page,(long)(page+1)*size>=matchingTotal-recommended,matchingTotal-recommended,matchingTotal,
-            matching,relatedPage,matchingTotal,relatedTotal,matchingLast,relatedLast,relatedSuggestions,Map.copyOf(reasons),query.correction,phraseCandidates.stream().sorted(Comparator.comparingInt((String p)->normal(p).startsWith(normalized)?0:1).thenComparing(String::length).thenComparing(Function.identity())).limit(4).map(p->new QuerySuggestion(p,"catalogue")).toList(),query.temporal.yearRequested()?"Published trip dates show month and day only; a travel year cannot be verified.":null,null);
+            matching,relatedPage,matchingTotal,relatedTotal,matchingLast,relatedLast,relatedSuggestions,Map.copyOf(reasons),query.correction,phraseCandidates.stream().sorted(Comparator.comparingInt((String p)->normal(p).startsWith(normalized)?0:1).thenComparing(String::length).thenComparing(Function.identity())).limit(4).map(p->new QuerySuggestion(p,"catalogue")).toList(),query.temporal.yearRequested()?"Published trip dates show month and day only; a travel year cannot be verified.":null,null,Map.of());
     }
 }

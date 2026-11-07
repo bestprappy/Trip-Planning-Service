@@ -206,7 +206,7 @@ class PostgresSchemaTests {
         return trip;
     }
 
-    @Test void dailyActivityWindowIncludesTodayAndSixPriorUtcDates() throws Exception {
+    @Test void dailyActivityWindowIncludesThirtyUtcDatesAndWeightsNewerActivity() throws Exception {
         var jdbc=new org.springframework.jdbc.core.JdbcTemplate(dataSource);
         var trip=java.util.UUID.randomUUID();var publication=java.util.UUID.randomUUID();
         jdbc.update("INSERT INTO trip.trip(id,user_id,display_name,destination_id,destination_name,start_date,end_date) VALUES(?,?,?,'test','Thailand','2026-01-01','2026-01-02')",trip,java.util.UUID.randomUUID(),"Activity test");
@@ -217,7 +217,9 @@ class PostgresSchemaTests {
         var copies=new com.navio.tripplanningservice.repository.SharedPlanCopyRepository(org.springframework.jdbc.core.simple.JdbcClient.create(dataSource));
         var copiedTrip=java.util.UUID.randomUUID();var user=java.util.UUID.randomUUID();
         copies.recordSuccessfulCopy(publication,copiedTrip,user);copies.recordSuccessfulCopy(publication,copiedTrip,user);
-        jdbc.update("INSERT INTO trip.publication_daily_activity(publication_id,activity_day,views,copies) VALUES(?,?,4,2),(?,?,100,100)",publication,today.minusDays(6),publication,today.minusDays(7));
-        assertThat(repository.scores(today).get(publication)).isEqualTo(15);
+        jdbc.update("INSERT INTO trip.publication_daily_activity(publication_id,activity_day,views,copies) VALUES(?,?,4,2),(?,?,100,100),(?,?,3,1),(?,?,999,999),(?,?,999,999)",publication,today.minusDays(6),publication,today.minusDays(7),publication,today.minusDays(29),publication,today.minusDays(30),publication,today.plusDays(1));
+        // Today: (2 views + 1 idempotent copy*3)*30; day6:10*24; day7:400*23; day29:6*1.
+        // Day30 and tomorrow are excluded. The next day naturally ages each event.
+        assertThat(repository.scores(today).get(publication)).isEqualTo(9596);
     }
 }
