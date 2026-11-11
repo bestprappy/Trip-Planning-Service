@@ -5,18 +5,16 @@ import java.util.*;
 final class PlanSearchEligibility {
  /** Catalogue retrieval keeps hard constraints, then admits partial topical evidence as Relevant. */
  static PlanSearchQuery.Match catalogue(SearchIntent intent,PublicSearchEvidence item,int dayCount){
+  if(!CatalogueEventIntent.supported(intent,item))return null;
   var full=evaluate(intent,item,dayCount);
   if(intent.raw().isBlank())return full;
   boolean meaningful=intent.spans().stream().anyMatch(s->s.kind().equals("geography"))
       ||intent.days()!=null&&intent.raw().matches(".*\\d.*")||!intent.required().isEmpty()||!intent.terms().isEmpty()
-      ||!intent.excluded().isEmpty()||intent.temporal().christmas()||intent.temporal().newYear()||!intent.temporal().months().isEmpty();
+      ||!intent.excluded().isEmpty()||!intent.excludedTerms().isEmpty()||intent.temporal().christmas()||intent.temporal().newYear()||!intent.temporal().months().isEmpty();
   if(!meaningful)return null;
   if(full!=null)return full;
   // Events, quoted names, exclusions, geography and durations cannot be relaxed by resemblance.
-  if(intent.blocked()||intent.temporal().christmas()||intent.temporal().newYear()||intent.temporal().yearRequested()
-      ||!intent.temporal().months().isEmpty()||!intent.temporal().calendarDays().isEmpty()
-      ||intent.required().stream().anyMatch(g->g.contains("festival"))
-      ||intent.terms().stream().anyMatch(t->t.contains(" ")||Set.of("lunar","chinese","songkran","christmas","easter","halloween","diwali","holi","ramadan","hanukkah","loy","krathong").contains(t)))return null;
+  if(intent.blocked()||CatalogueEventIntent.constrained(intent)||intent.terms().stream().anyMatch(t->t.contains(" ")))return null;
   var constraints=new SearchIntent(intent.raw(),intent.normalized(),intent.geography(),intent.geographyAny(),intent.geographicGroups(),intent.excludedTerms(),
       List.of(),intent.excluded(),intent.preferred(),intent.examples(),List.of(),intent.temporal(),intent.days(),intent.notices(),intent.blocked(),intent.spans());
   if(evaluate(constraints,item,dayCount)==null)return null;

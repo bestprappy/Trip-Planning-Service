@@ -38,4 +38,27 @@ class CataloguePlanSearchTests extends SearchTestFixtures {
   var result=service.search("Thailand Christmas festival","",null,0,12,"relevance");
   assertThat(result.querySuggestions()).isNotEmpty().allMatch(s->s.text().contains("Christmas")&&s.text().contains("Thailand"));
  }
+ @Test void quotedExclusionAloneRemainsMeaningfulWithOrWithoutSelectedCountry(){
+  rows(row("temple","Temple of Dawn","Bangkok","Thailand",3),row("food","Bangkok food","Bangkok","Thailand",3),row("japan","Tokyo food","Tokyo","Japan",3));
+  assertThat(service.search("without \"Temple of Dawn\"","",null,0,12,"relevance").matching()).extracting(p->p.token()).containsExactlyInAnyOrder("food","japan");
+  assertThat(service.search("without \"Temple of Dawn\"","TH",null,0,12,"relevance").matching()).extracting(p->p.token()).containsExactly("food");
+ }
+ @Test void namedOccasionsAreRequiredAndPreservedInCompletions(){
+  for(String event:java.util.List.of("Thanksgiving","Carnival","Oktoberfest","Vesak","Mardi Gras","Wonderfest")){
+   rows(row("ordinary","Bangkok food","Bangkok","Thailand",3));
+   var empty=service.search("Bangkok "+event+" food","",null,0,12,"relevance");
+   assertThat(empty.related()).as(event).isEmpty();assertThat(empty.querySuggestions()).as(event).isEmpty();
+   rows(row("event",event+" food walk","Bangkok","Thailand",3));
+   var supported=service.search("Bangkok "+event+" food","",null,0,12,"relevance");
+   assertThat(supported.matching()).as(event).hasSize(1);
+   assertThat(supported.querySuggestions()).as(event).isNotEmpty().allMatch(s->s.text().contains(event));
+  }
+ }
+ @Test void quotedOccasionNamesRemainNamesRatherThanAffirmativeEventRequirements(){
+  rows(withPlaces(row("cafe","Cafe visit","Bangkok","Thailand",3),"cafe","Thanksgiving Cafe","Bangkok, Thailand"),row("food","Bangkok food","Bangkok","Thailand",3));
+  assertThat(service.search("without \"Thanksgiving Cafe\"","TH",null,0,12,"relevance").matching()).extracting(p->p.token()).containsExactly("food");
+  var quoted=service.search("Bangkok \"Thanksgiving Cafe\"","",null,0,12,"relevance");
+  assertThat(quoted.matching()).extracting(p->p.token()).containsExactly("cafe");
+  assertThat(quoted.querySuggestions()).allMatch(s->s.text().contains("Thanksgiving Cafe"));
+ }
 }
