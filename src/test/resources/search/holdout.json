@@ -179,7 +179,11 @@
     "matching": [
       "both"
     ],
-    "relevant": []
+    "relevant": [
+      "mountain",
+      "weekend",
+      "garden"
+    ]
   },
   {
     "id": "9-9",
@@ -187,7 +191,11 @@
     "matching": [
       "both"
     ],
-    "relevant": []
+    "relevant": [
+      "mountain",
+      "weekend",
+      "garden"
+    ]
   },
   {
     "id": "10-8",

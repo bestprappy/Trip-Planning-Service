@@ -1,5 +1,5 @@
 {
- "version":"travel-1",
+ "version":"travel-2",
  "concepts":[
   {"id":"scenic","label":"scenic","aliases":["scenic","scenery","scenary","views","view","viewpoint","viewpoints","lookout","landscape"],"parents":[]},
   {"id":"nature","label":"nature","aliases":["nature","natural scenery","outdoors","outdoor","green spaces"],"parents":["scenic"]},
@@ -10,6 +10,8 @@
   {"id":"beach","label":"beaches","aliases":["beach","beaches","coast","coastal","seaside"],"parents":["nature"]},
   {"id":"national-park","label":"national parks","aliases":["national park","national parks"],"parents":["nature"]},
   {"id":"food","label":"food","aliases":["food","dining","culinary","eating","eat","foodie","gastronomy"],"parents":[]},
+  {"id":"street-food","label":"street food","aliases":["street food","street foods","hawker","hawkers"],"parents":["food"]},
+  {"id":"dessert","label":"desserts","aliases":["dessert","desserts","sweets","sweet","bakery","bakeries","ice cream"],"parents":["food"]},
   {"id":"restaurant","label":"restaurants","aliases":["restaurant","restaurants"],"parents":["food"]},
   {"id":"cafe","label":"cafes","aliases":["cafe","cafes","coffee shop","coffee shops"],"parents":["food"]},
   {"id":"sushi","label":"sushi","aliases":["sushi"],"parents":["restaurant"]},

@@ -5,9 +5,9 @@ import java.util.*;
 import static org.assertj.core.api.Assertions.*;
 
 class SmartSearchIntentTests extends SearchTestFixtures {
- @Test void naturalHolidayPhrasingGetsIdeasWithoutInventingPlans(){
+ @Test void emptyCatalogueDoesNotInventHolidayIdeas(){
   rows();var result=service.search("Thailand Christmas Holiday","",null,0,12,"relevance");
-  assertThat(result.querySuggestions()).extracting(SharedPlanSearchService.QuerySuggestion::text).contains("Christmas holiday trips in Thailand");
+  assertThat(result.querySuggestions()).isEmpty();
   assertThat(result.matching()).isEmpty();
  }
  @Test void examplesArePreferencesAndExplicitAndOrAreDifferent(){

@@ -31,14 +31,12 @@ class SmartSearchJudgedTests extends SearchTestFixtures {
  }
  @Test void heldOutRetrievalMetricsUseFixedManualLabels(){
   rows(publications().toArray(com.navio.tripplanningservice.model.TripPublication[]::new));
-  double matchingPrecision=0,relevantPrecision=0,recall=0,ndcg=0;int matchingQueries=0,relevantQueries=0,positiveQueries=0,rewrites=0,validRewrites=0;
+  double matchingPrecision=0,relevantPrecision=0,recall=0,ndcg=0;int matchingQueries=0,relevantQueries=0,positiveQueries=0;
   var holdout=fixtures("holdout",Judgement.class);
   for(var j:holdout){
    var result=service.search(j.query(),"",null,0,48,"relevance");
-   for(var suggestion:result.searchAssist().suggestions())if(suggestion.kind().equals("rewrite")){
-    rewrites++;var rewritten=service.search(suggestion.action().query(),"",null,0,48,"relevance");
-    if(new HashSet<>(rewritten.matching().stream().map(p->p.token()).toList()).equals(new HashSet<>(j.matching()))&&new HashSet<>(rewritten.related().stream().map(p->p.token()).toList()).equals(new HashSet<>(j.relevant())))validRewrites++;
-   }
+   assertThat(result.searchAssist().suggestions()).isEmpty();
+   assertThat(result.querySuggestions()).allMatch(s->s.source().equals("catalogue"));
    var matching=result.matching().stream().limit(5).map(p->p.token()).toList();
    var relevant=result.related().stream().limit(5).map(p->p.token()).toList();
    if(!matching.isEmpty()){matchingPrecision+=matching.stream().filter(j.matching()::contains).count()/(double)matching.size();matchingQueries++;}
@@ -55,8 +53,6 @@ class SmartSearchJudgedTests extends SearchTestFixtures {
   assertThat(matchingQueries).isPositive();assertThat(relevantQueries).isPositive();assertThat(positiveQueries).isPositive();
   assertThat(matchingPrecision/matchingQueries).isGreaterThanOrEqualTo(.95);assertThat(relevantPrecision/relevantQueries).isGreaterThanOrEqualTo(.9);
   assertThat(recall/positiveQueries).isGreaterThanOrEqualTo(.9);assertThat(ndcg/positiveQueries).isGreaterThanOrEqualTo(.9);
-  assertThat(rewrites).isPositive();assertThat(validRewrites/(double)rewrites).isGreaterThanOrEqualTo(.95);
   System.out.printf(Locale.ROOT,"SMART_SEARCH_HOLDOUT queries=%d positive=%d matchingP5=%.3f relevantP5=%.3f recall10=%.3f nDCG10=%.3f%n",holdout.size(),positiveQueries,matchingPrecision/matchingQueries,relevantPrecision/relevantQueries,recall/positiveQueries,ndcg/positiveQueries);
-  System.out.printf(Locale.ROOT,"SMART_SEARCH_REWRITES evaluated=%d retrievalPreserving=%d%n",rewrites,validRewrites);
  }
 }

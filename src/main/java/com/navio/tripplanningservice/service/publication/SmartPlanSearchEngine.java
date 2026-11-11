@@ -81,9 +81,9 @@ final class SmartPlanSearchEngine {
   if(filters.collections().contains("events"))order=order.thenComparingLong(r->PlanDiscovery.eventProximity(r.entry().parsed().evidence(),today));
   order=order.thenComparing(r->r.entry().row().getListedAt(),Comparator.nullsLast(Comparator.reverseOrder())).thenComparing(r->r.entry().row().getToken());
   var matching=new ArrayList<Ranked>();var relevant=new ArrayList<Ranked>();
-  for(var entry:entries){if(!selected.isBlank()&&!entry.parsed().evidence().countries().contains(selected))continue;var match=PlanSearchEligibility.evaluate(intent,entry.parsed().evidence(),entry.parsed().plan().dayCount());if(match!=null)(match.strong()?matching:relevant).add(new Ranked(entry,match));}
+  for(var entry:entries){if(!selected.isBlank()&&!entry.parsed().evidence().countries().contains(selected))continue;var match=PlanSearchEligibility.catalogue(intent,entry.parsed().evidence(),entry.parsed().plan().dayCount());if(match!=null)(match.strong()?matching:relevant).add(new Ranked(entry,match));}
   matching.sort(order);relevant.sort(order);
-  var suggestions=QuerySuggestionComposer.compose(intent,locations.values(),selected,days,candidate->entries.stream().filter(e->selected.isBlank()||e.parsed().evidence().countries().contains(selected)).filter(e->PlanSearchEligibility.evaluate(candidate,e.parsed().evidence(),e.parsed().plan().dayCount())!=null).count());
+  List<SearchAssist.Suggestion> suggestions=List.of();
   var retained=new LinkedHashMap<UUID,Ranked>();int capacity=page*size+size+6;
   Stream.concat(window(matching,0,capacity).stream(),window(relevant,0,capacity).stream()).forEach(r->retained.put(r.entry().row().getId(),r));
   var copyStats=allCopies;
@@ -106,7 +106,27 @@ final class SmartPlanSearchEngine {
   String fingerprint=digest(query+"|"+country+"|"+days+"|"+sort+"|"+filters.signature()+"|"+TravelConcepts.DATA.version());
   String interpretation=intent.required().isEmpty()?"":String.join(" and ",intent.required().stream().map(g->String.join(" or ",g.stream().sorted().map(TravelConcepts::label).toList())).toList());
   var assist=new SearchAssist(1,TravelConcepts.DATA.version(),term,country,days,sort,fingerprint,revision,256,interpretation,intent.notices(),suggestions,intent.blocked());
-  var querySuggestions=suggestions.stream().filter(s->s.kind().equals("rewrite")).limit(3).map(s->new QuerySuggestion(s.text(),"vocabulary")).toList();
+  var completions=new LinkedHashSet<String>();
+  if(!term.isBlank()&&intent.excluded().isEmpty()&&intent.excludedTerms().isEmpty()&&!intent.geographyAny())Stream.concat(matching.stream(),relevant.stream()).limit(12).forEach(r->{
+   var evidence=r.entry().parsed().evidence();var plan=r.entry().parsed().plan();
+   String destination=Objects.toString(plan.destinationCity(),"").strip();
+   if(destination.isBlank())destination=Objects.toString(plan.destinationCountry(),"").strip();
+   if(intent.spans().stream().anyMatch(s->s.kind().equals("geography")))destination=String.join(" ",intent.geography().stream().map(PlanSearchQuery.Location::name).toList());
+   // Labels come only from concepts actually mentioned in this publication, never a phrase template.
+   boolean hasCompletion=false;
+   for(var mention:TravelConcepts.mentions(evidence.strongText())){
+    var parents=new HashSet<String>();TravelConcepts.addParents(mention.id(),parents);
+    boolean requested=intent.required().stream().anyMatch(g->!Collections.disjoint(g,parents))
+        ||intent.terms().stream().anyMatch(t->mention.text().startsWith(t));
+    if(requested&&!destination.isBlank()){hasCompletion=true;completions.add(destination+" "+TravelConcepts.label(mention.id()));}
+   }
+   if((!hasCompletion||intent.temporal().christmas()||intent.temporal().newYear())&&completions.size()<4&&!evidence.title().isBlank())completions.add(destination.isBlank()||normal(evidence.title()).contains(normal(destination))?evidence.title():destination+" "+evidence.title());
+  });
+  var querySuggestions=completions.stream().filter(s->!normal(s).equals(query)).filter(s->{
+   var candidate=SearchIntentParser.parse(s,locations.values(),selected,days);
+   return candidate.temporal().equals(intent.temporal())&&Objects.equals(candidate.days(),intent.days())
+       &&intent.terms().stream().filter(t->Set.of("lunar","chinese","songkran","easter","halloween","diwali","holi","ramadan","hanukkah","loy","krathong").contains(t)).allMatch(t->TravelConcepts.has(normal(s),t));
+  }).limit(6).map(s->new QuerySuggestion(s,"catalogue")).toList();
   String correction=PlanSearchQuery.parse(term,locations.values(),country).correction;
   boolean strongLast=(long)(page+1)*size>=matching.size(),weakLast=(long)(page+1)*size>=relevant.size();
   org.slf4j.LoggerFactory.getLogger(SmartPlanSearchEngine.class).debug("Public search completed: publications={}, elapsedMs={}",entries.size(),(System.nanoTime()-began)/1_000_000);

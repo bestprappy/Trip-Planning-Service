@@ -8,8 +8,8 @@ class SmartSearchAdversarialTests extends SearchTestFixtures {
   assertThat(service.search("Thailand \"Christmas Cafe\"","",null,0,12,"relevance").matching()).hasSize(1);
   assertThat(service.search("Thailand \"Cafe Christmas\"","",null,0,12,"relevance").matching()).isEmpty();
  }
- @Test void selectedCountryProvidesContextForNaturalRewrites(){
-  rows();assertThat(service.search("Christmas Holiday","TH",null,0,12,"relevance").querySuggestions()).extracting(SharedPlanSearchService.QuerySuggestion::text).contains("Christmas holiday trips in Thailand");
+ @Test void selectedCountryDoesNotInventSuggestionsWithoutPublications(){
+  rows();assertThat(service.search("Christmas Holiday","TH",null,0,12,"relevance").querySuggestions()).isEmpty();
  }
  @Test void booleanActivityOrDoesNotRelaxCityGeography(){
   rows(withPlaces(row("tokyo","Garden afternoon","Tokyo","Japan",3),"botanical_garden","Garden","Tokyo, Japan"),withPlaces(row("kyoto","Garden afternoon","Kyoto","Japan",3),"botanical_garden","Garden","Kyoto, Japan"));
@@ -23,11 +23,11 @@ class SmartSearchAdversarialTests extends SearchTestFixtures {
   rows();var result=service.search("Thailand Christmas Holiday 3 days","",null,0,12,"relevance");
   assertThat(result.searchAssist().suggestions()).allMatch(s->s.action().query().contains("3 day"));
  }
- @Test void emptySpecificEventSearchOffersAnExplicitUsefulBroaderSearch(){
+ @Test void emptySpecificEventSearchDoesNotFabricateBroaderAlternatives(){
   rows(row("christmas","Christmas markets","Bangkok","Thailand",3));
   var result=service.search("Thailand Christmas weekend","",null,0,12,"relevance");
   assertThat(result.matching()).isEmpty();assertThat(result.related()).isEmpty();
-  assertThat(result.searchAssist().suggestions()).anyMatch(s->s.kind().equals("broaden")&&s.availability().equals("available")&&!s.action().query().toLowerCase().contains("weekend")&&s.changedFacets().contains("interests"));
+  assertThat(result.searchAssist().suggestions()).isEmpty();assertThat(result.querySuggestions()).isEmpty();
  }
  @Test void countryContextDoesNotSatisfyAnOrGroupOfCities(){
   rows(row("tokyo","City visit","Tokyo","Japan",3),row("kyoto","City visit","Kyoto","Japan",3),row("osaka","City visit","Osaka","Japan",3));
