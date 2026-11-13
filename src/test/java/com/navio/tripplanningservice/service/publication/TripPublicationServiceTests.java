@@ -59,6 +59,7 @@ class TripPublicationServiceTests {
     @Mock TripService tripService;
     @Mock com.navio.tripplanningservice.repository.SharedPlanCopyRepository copyEvents;
     @Mock PublicationEvents publicationEvents;
+    @Mock com.navio.tripplanningservice.repository.PublicationViewerRepository viewers;
 
     private TripPublicationService service;
 
@@ -71,7 +72,7 @@ class TripPublicationServiceTests {
                 new PlanPublicationSanitizer(),
                 tokenGenerator,
                 new ObjectMapper().registerModule(new JavaTimeModule()),
-                new ExplorePlanSummarizer(), tripService, copyEvents, publicationEvents);
+                new ExplorePlanSummarizer(), tripService, copyEvents, publicationEvents, viewers);
     }
 
     // ---------------------------------------------------------- authorization
@@ -259,7 +260,7 @@ class TripPublicationServiceTests {
         when(publicationRepository.findByTokenAndStatus("tok-existing", TripPublication.PublicationStatus.ACTIVE))
                 .thenReturn(Optional.of(activePublication(2)));
 
-        SharedPlanResponse response = service.readSharedPlan("tok-existing");
+        SharedPlanResponse response = service.readSharedPlan("tok-existing", null);
 
         assertThat(response.plan().title()).isEqualTo("Songkran road trip");
         assertThat(response.publishedAt()).isNotNull();
@@ -274,9 +275,9 @@ class TripPublicationServiceTests {
     void everyDeadLinkFailsIdenticallySoProbesLearnNothing() {
         when(publicationRepository.findByTokenAndStatus(any(), any())).thenReturn(Optional.empty());
 
-        String unknown = catchMessage(() -> service.readSharedPlan("tok-never-existed"));
-        String blank = catchMessage(() -> service.readSharedPlan(""));
-        String nullToken = catchMessage(() -> service.readSharedPlan(null));
+        String unknown = catchMessage(() -> service.readSharedPlan("tok-never-existed", null));
+        String blank = catchMessage(() -> service.readSharedPlan("", null));
+        String nullToken = catchMessage(() -> service.readSharedPlan(null, null));
 
         assertThat(unknown).isEqualTo("This shared plan is no longer available");
         assertThat(blank).isEqualTo(unknown);
@@ -292,7 +293,7 @@ class TripPublicationServiceTests {
     void scopesTheAnonymousLookupToActiveRowsInTheQueryItself() {
         when(publicationRepository.findByTokenAndStatus(any(), any())).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.readSharedPlan("tok-existing"))
+        assertThatThrownBy(() -> service.readSharedPlan("tok-existing", null))
                 .isInstanceOf(TripPublicationService.SharedPlanUnavailableException.class);
 
         verify(publicationRepository)
@@ -311,7 +312,7 @@ class TripPublicationServiceTests {
         when(publicationRepository.findByTokenAndStatus("tok-existing", TripPublication.PublicationStatus.ACTIVE))
                 .thenReturn(Optional.of(stale));
 
-        assertThatThrownBy(() -> service.readSharedPlan("tok-existing"))
+        assertThatThrownBy(() -> service.readSharedPlan("tok-existing", null))
                 .isInstanceOf(TripPublicationService.SharedPlanUnavailableException.class);
     }
 
@@ -332,7 +333,7 @@ class TripPublicationServiceTests {
         when(publicationRepository.findByTokenAndStatus("tok-existing", TripPublication.PublicationStatus.ACTIVE))
                 .thenReturn(Optional.of(corrupt));
 
-        assertThatThrownBy(() -> service.readSharedPlan("tok-existing"))
+        assertThatThrownBy(() -> service.readSharedPlan("tok-existing", null))
                 .isInstanceOf(TripPublicationService.SharedPlanUnavailableException.class);
 
         verifyNoInteractions(plannerService, tripRepository);
@@ -392,7 +393,7 @@ class TripPublicationServiceTests {
         assertThat(response.title()).isEqualTo("Top 10 things to do in Japan");
         when(publicationRepository.findByTokenAndStatus("tok-title", TripPublication.PublicationStatus.ACTIVE))
                 .thenReturn(Optional.of(saved.getValue()));
-        assertThat(service.readSharedPlan("tok-title").plan().title())
+        assertThat(service.readSharedPlan("tok-title", null).plan().title())
                 .isEqualTo("Top 10 things to do in Japan");
     }
 
@@ -493,7 +494,7 @@ class TripPublicationServiceTests {
         when(publicationRepository.findByTokenAndStatus("tok-existing", TripPublication.PublicationStatus.ACTIVE))
                 .thenReturn(Optional.of(listed));
 
-        assertThat(service.readSharedPlan("tok-existing").listedInExplore()).isTrue();
+        assertThat(service.readSharedPlan("tok-existing", null).listedInExplore()).isTrue();
     }
 
     @Test
@@ -548,12 +549,13 @@ class TripPublicationServiceTests {
         var id = UUID.randomUUID(); listed.setId(id); listed.setListedInExplore(true); listed.setViewCount(12L);
         when(publicationRepository.findByTokenAndStatus("tok-existing", TripPublication.PublicationStatus.ACTIVE)).thenReturn(Optional.of(listed));
         when(copyEvents.counts(List.of(id))).thenReturn(java.util.Map.of(id, new com.navio.tripplanningservice.repository.SharedPlanCopyRepository.CopyStats(8,3)));
-        var response=service.readSharedPlan("tok-existing");
+        when(viewers.registerFirstView(id, VISITOR)).thenReturn(true);
+        var response=service.readSharedPlan("tok-existing", VISITOR);
         assertThat(response.engagement().copyCount()).isEqualTo(8);
         assertThat(response.engagement().uniqueCopierCount()).isEqualTo(3);
         assertThat(response.engagement().viewCount()).isEqualTo(13);
         listed.setListedInExplore(false);
-        assertThat(service.readSharedPlan("tok-existing").engagement()).isNull();
+        assertThat(service.readSharedPlan("tok-existing", VISITOR).engagement()).isNull();
         verify(copyEvents).counts(List.of(id));
     }
 
@@ -814,7 +816,7 @@ class TripPublicationServiceTests {
                 .thenReturn(Optional.of(listed));
 
         ExplorePlanSummary card = service.listExplorePlans(PageRequest.of(0, 20)).getContent().getFirst();
-        SharedPlanResponse shared = service.readSharedPlan("tok-existing");
+        SharedPlanResponse shared = service.readSharedPlan("tok-existing", null);
 
         assertThat(card.authorName()).isEqualTo("Kanya S.");
         assertThat(shared.authorName()).isEqualTo("Kanya S.");
@@ -847,6 +849,64 @@ class TripPublicationServiceTests {
                 .createdAt(Instant.EPOCH)
                 .updatedAt(Instant.EPOCH)
                 .build();
+    }
+
+    // ------------------------------------------------------------ view counting
+
+    private static final UUID VISITOR = UUID.fromString("00000000-0000-4000-8000-0000000000a1");
+
+    private TripPublication listedPublication(long views) {
+        TripPublication listed = activePublication(2);
+        listed.setListedInExplore(true);
+        listed.setViewCount(views);
+        when(publicationRepository.findByTokenAndStatus("tok-existing", TripPublication.PublicationStatus.ACTIVE))
+                .thenReturn(Optional.of(listed));
+        return listed;
+    }
+
+    @Test
+    void countsABrowsersFirstViewOfAListedPlan() {
+        TripPublication listed = listedPublication(4L);
+        when(viewers.registerFirstView(listed.getId(), VISITOR)).thenReturn(true);
+
+        SharedPlanResponse response = service.readSharedPlan("tok-existing", VISITOR);
+
+        verify(publicationRepository).incrementViewCount(listed.getId());
+        assertThat(response.engagement().viewCount()).isEqualTo(5);
+    }
+
+    @Test
+    void doesNotCountTheSameBrowserReopeningAPlan() {
+        TripPublication listed = listedPublication(5L);
+        when(viewers.registerFirstView(listed.getId(), VISITOR)).thenReturn(false);
+
+        SharedPlanResponse response = service.readSharedPlan("tok-existing", VISITOR);
+
+        verify(publicationRepository, never()).incrementViewCount(any());
+        assertThat(response.engagement().viewCount()).isEqualTo(5);
+    }
+
+    @Test
+    void servesButDoesNotCountAReadWithoutABrowserId() {
+        TripPublication listed = listedPublication(5L);
+
+        SharedPlanResponse response = service.readSharedPlan("tok-existing", null);
+
+        verifyNoInteractions(viewers);
+        verify(publicationRepository, never()).incrementViewCount(any());
+        assertThat(response.plan().title()).isEqualTo("Songkran road trip");
+        assertThat(response.engagement().viewCount()).isEqualTo(listed.getViewCount());
+    }
+
+    @Test
+    void neverRecordsViewersOfAnUnlistedLink() {
+        when(publicationRepository.findByTokenAndStatus("tok-existing", TripPublication.PublicationStatus.ACTIVE))
+                .thenReturn(Optional.of(activePublication(2)));
+
+        service.readSharedPlan("tok-existing", VISITOR);
+
+        verifyNoInteractions(viewers);
+        verify(publicationRepository, never()).incrementViewCount(any());
     }
 
     private TripPublication activePublication(int revision) {

@@ -48,7 +48,7 @@ import java.util.UUID;
  * authorization check and the existence check are the same query, which is why
  * there is no path that forgets one.
  *
- * <p>The anonymous side is {@link #readSharedPlan(String)}, which takes no user
+ * <p>The anonymous side is {@link #readSharedPlan(String, UUID)}, which takes no user
  * at all. It can reach exactly one row, by token, and returns only the frozen
  * sanitised snapshot.
  */
@@ -70,6 +70,7 @@ public class TripPublicationService {
     @org.springframework.beans.factory.annotation.Autowired(required=false)
     private com.navio.tripplanningservice.repository.PublicationActivityRepository activity;
     private final PublicationEvents publicationEvents;
+    private final com.navio.tripplanningservice.repository.PublicationViewerRepository viewers;
 
     public PublicationResponse getPublication(UUID tripId, UUID userId) {
         Trip trip = requireOwnedTrip(tripId, userId);
@@ -179,9 +180,14 @@ public class TripPublicationService {
      * A caller must not be able to tell "this link never existed" from "this link
      * was withdrawn", because the second confirms a trip exists and that someone
      * decided to stop showing it.
+     *
+     * <p>A listed plan counts one view per browser: {@code visitorId} is the
+     * reader's per-browser cookie value, the same whether they are signed in or
+     * not. A read without one (a script, a browser refusing cookies) is served
+     * but not counted, so reloading or scraping cannot inflate the number.
      */
     @Transactional
-    public SharedPlanResponse readSharedPlan(String token) {
+    public SharedPlanResponse readSharedPlan(String token, UUID visitorId) {
         if (token == null || token.isBlank()) {
             throw new SharedPlanUnavailableException();
         }
@@ -199,7 +205,10 @@ public class TripPublicationService {
         }
 
         PublicPlanSnapshot snapshot = deserialize(publication);
-        if (publication.isListed()) {
+        boolean counted = publication.isListed()
+                && visitorId != null
+                && viewers.registerFirstView(publication.getId(), visitorId);
+        if (counted) {
             publicationRepository.incrementViewCount(publication.getId());
             if(activity!=null)activity.view(publication.getId());
         }
@@ -208,7 +217,7 @@ public class TripPublicationService {
                 publication.getPublishedAt(),
                 publication.isListed(),
                 publication.getAuthorDisplayName(),
-                publication.isListed() ? engagement(publication, true) : null);
+                publication.isListed() ? engagement(publication, counted) : null);
     }
 
     /**

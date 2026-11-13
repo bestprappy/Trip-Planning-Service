@@ -43,6 +43,12 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class SharedPlanController {
 
+    /**
+     * The reader's per-browser id, forwarded by the web app from its cookie. Used
+     * only to count each browser's view once; it never changes what is returned.
+     */
+    static final String VISITOR_HEADER = "X-Navio-Visitor";
+
     /** Caps an anonymous caller's page size so the feed cannot be pulled in one request. */
     static final int MAX_PAGE_SIZE = 48;
 
@@ -73,8 +79,10 @@ public class SharedPlanController {
      * or a browser's disk cache outlives the owner's decision to stop sharing.
      */
     @GetMapping("/{token}")
-    public ResponseEntity<SharedPlanResponse> getSharedPlan(@PathVariable String token) {
-        SharedPlanResponse response = publicationService.readSharedPlan(token);
+    public ResponseEntity<SharedPlanResponse> getSharedPlan(
+            @PathVariable String token,
+            @RequestHeader(name = VISITOR_HEADER, required = false) String visitor) {
+        SharedPlanResponse response = publicationService.readSharedPlan(token, parseVisitor(visitor));
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore().mustRevalidate())
                 .header("X-Robots-Tag", "noindex, nofollow, noarchive")
@@ -148,5 +156,15 @@ public class SharedPlanController {
             @org.springframework.web.bind.annotation.RequestBody(required=false) com.navio.tripplanningservice.dto.publication.CopyPlanRequest request) {
         return ResponseEntity.status(201).cacheControl(CacheControl.noStore())
                 .body(request==null?publicationService.copySharedPlan(token, userId):publicationService.copySharedPlan(token,userId,request));
+    }
+
+    /** A missing or malformed visitor id reads the plan without counting a view. */
+    private static UUID parseVisitor(String visitor) {
+        if (visitor == null || visitor.isBlank()) return null;
+        try {
+            return UUID.fromString(visitor.strip());
+        } catch (IllegalArgumentException malformed) {
+            return null;
+        }
     }
 }
