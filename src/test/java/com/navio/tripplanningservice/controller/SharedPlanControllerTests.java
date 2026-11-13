@@ -85,8 +85,30 @@ class SharedPlanControllerTests {
     }
 
     @Test
+    void passesTheBrowsersVisitorIdSoEachBrowserCountsOnce() throws Exception {
+        UUID visitor = UUID.fromString("00000000-0000-4000-8000-0000000000a1");
+        when(publicationService.readSharedPlan(TOKEN, visitor)).thenReturn(sharedPlan());
+
+        mockMvc.perform(get("/v1/shared-plans/{token}", TOKEN).header("X-Navio-Visitor", visitor.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.plan.title").value("Songkran road trip"));
+
+        verify(publicationService).readSharedPlan(TOKEN, visitor);
+    }
+
+    @Test
+    void readsWithoutCountingWhenTheVisitorIdIsMalformed() throws Exception {
+        when(publicationService.readSharedPlan(TOKEN, null)).thenReturn(sharedPlan());
+
+        mockMvc.perform(get("/v1/shared-plans/{token}", TOKEN).header("X-Navio-Visitor", "not-a-uuid"))
+                .andExpect(status().isOk());
+
+        verify(publicationService).readSharedPlan(TOKEN, null);
+    }
+
+    @Test
     void servesAPublishedPlanToACallerWithNoIdentityAtAll() throws Exception {
-        when(publicationService.readSharedPlan(TOKEN)).thenReturn(sharedPlan());
+        when(publicationService.readSharedPlan(TOKEN, null)).thenReturn(sharedPlan());
 
         mockMvc.perform(get("/v1/shared-plans/{token}", TOKEN))
                 .andExpect(status().isOk())
@@ -104,7 +126,7 @@ class SharedPlanControllerTests {
      */
     @Test
     void forbidsCachingSoRevocationTakesEffectImmediately() throws Exception {
-        when(publicationService.readSharedPlan(TOKEN)).thenReturn(sharedPlan());
+        when(publicationService.readSharedPlan(TOKEN, null)).thenReturn(sharedPlan());
 
         mockMvc.perform(get("/v1/shared-plans/{token}", TOKEN))
                 .andExpect(header().string("Cache-Control",
@@ -113,7 +135,7 @@ class SharedPlanControllerTests {
 
     @Test
     void asksSearchEnginesNotToIndexAnUnlistedPlan() throws Exception {
-        when(publicationService.readSharedPlan(TOKEN)).thenReturn(sharedPlan());
+        when(publicationService.readSharedPlan(TOKEN, null)).thenReturn(sharedPlan());
 
         mockMvc.perform(get("/v1/shared-plans/{token}", TOKEN))
                 .andExpect(header().string("X-Robots-Tag", "noindex, nofollow, noarchive"))
@@ -124,7 +146,7 @@ class SharedPlanControllerTests {
 
     @Test
     void answersADeadLinkWithoutNamingTheOwnerOrTheTrip() throws Exception {
-        when(publicationService.readSharedPlan(TOKEN))
+        when(publicationService.readSharedPlan(TOKEN, null))
                 .thenThrow(new TripPublicationService.SharedPlanUnavailableException());
 
         mockMvc.perform(get("/v1/shared-plans/{token}", TOKEN))
@@ -183,7 +205,7 @@ class SharedPlanControllerTests {
                 .andExpect(jsonPath("$.token").value(TOKEN))
                 .andExpect(jsonPath("$.title").value("Songkran road trip"))
                 .andExpect(jsonPath("$.chargerCount").value(1));
-        verify(publicationService, org.mockito.Mockito.never()).readSharedPlan(any());
+        verify(publicationService, org.mockito.Mockito.never()).readSharedPlan(any(), any());
     }
 
     @Test

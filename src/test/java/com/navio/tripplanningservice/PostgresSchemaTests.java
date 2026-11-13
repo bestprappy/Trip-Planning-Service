@@ -69,8 +69,9 @@ class PostgresSchemaTests {
                 // V17 precise charging plan, V18 transit route choice, V19 time source, V20 stop schedule,
                 // V21 copy events, V22 shared sections and trip vehicles, V23 day sections,
                 // V24 profile pins, V25 the trip.events.v1 outbox, and V26 saved station evidence.
-                // V27 persisted feedback and V28 daily discovery activity are additive too.
-                assertThat(upgraded.migrate().migrationsExecuted).isEqualTo(15);
+                // V27 persisted feedback and V28 daily discovery activity are additive too,
+                // as is V29's per-browser viewer ledger.
+                assertThat(upgraded.migrate().migrationsExecuted).isEqualTo(16);
                 upgraded.validate();
                 try (var connection = java.sql.DriverManager.getConnection(upgradeUrl, username, password);
                      var sql = connection.createStatement(); var row = sql.executeQuery("SELECT count(*) FROM trip.shared_plan_copy WHERE publication_id='33333333-3333-4333-8333-333333333333'")) {
@@ -116,6 +117,27 @@ class PostgresSchemaTests {
         assertThat(repository.counts(java.util.List.of())).isEmpty();
         jdbc.sql("DELETE FROM trip.trip_publication WHERE id=:id").param("id",publication).update();
         assertThat(repository.counts(java.util.List.of(publication))).isEmpty();
+    }
+
+    @Test
+    void viewerLedgerAdmitsEachBrowserOncePerPlanAndGoesWithThePublication() {
+        var jdbc = org.springframework.jdbc.core.simple.JdbcClient.create(dataSource);
+        var trip = java.util.UUID.randomUUID();
+        var publication = java.util.UUID.randomUUID();
+        jdbc.sql("INSERT INTO trip.trip(id,user_id,start_date,end_date,destination_id,destination_name) VALUES (:id,:user,CURRENT_DATE,CURRENT_DATE,'test','Test')")
+            .param("id", trip).param("user", java.util.UUID.randomUUID()).update();
+        jdbc.sql("INSERT INTO trip.trip_publication(id,trip_id,token,snapshot,sanitizer_version,source_trip_version) VALUES (:id,:trip,:token,'{}',1,0)")
+            .param("id", publication).param("trip", trip).param("token", "test-" + publication).update();
+        var viewers = new com.navio.tripplanningservice.repository.PublicationViewerRepository(jdbc);
+        var browser = java.util.UUID.randomUUID();
+
+        assertThat(viewers.registerFirstView(publication, browser)).isTrue();
+        assertThat(viewers.registerFirstView(publication, browser)).isFalse();
+        assertThat(viewers.registerFirstView(publication, java.util.UUID.randomUUID())).isTrue();
+
+        jdbc.sql("DELETE FROM trip.trip_publication WHERE id=:id").param("id", publication).update();
+        assertThat(jdbc.sql("SELECT count(*) FROM trip.publication_viewer WHERE publication_id=:id")
+            .param("id", publication).query(Long.class).single()).isZero();
     }
 
     @Test
