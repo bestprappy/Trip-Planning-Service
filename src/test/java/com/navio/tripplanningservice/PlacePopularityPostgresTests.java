@@ -15,7 +15,6 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @DataJpaTest(properties = {
-        "spring.config.import=", "spring.cloud.config.enabled=false",
         "spring.datasource.url=${NAVIO_TEST_DB_URL}",
         "spring.datasource.username=${NAVIO_TEST_DB_USERNAME:tripplanner}",
         "spring.datasource.password=${NAVIO_TEST_DB_PASSWORD:tripplanner}",
