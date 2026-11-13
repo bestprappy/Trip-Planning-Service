@@ -36,6 +36,24 @@ public class GlobalExceptionHandler {
             .status(ex.status()).message(ex.getMessage()).build());
     }
 
+    @ExceptionHandler(com.navio.tripplanningservice.media.PictureException.class)
+    public ResponseEntity<ErrorResponse> handlePicture(com.navio.tripplanningservice.media.PictureException ex) {
+        return ResponseEntity.status(ex.status()).body(ErrorResponse.builder().timestamp(Instant.now())
+                .status(ex.status().value()).message(ex.getMessage()).build());
+    }
+
+    @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+    public ResponseEntity<ErrorResponse> handlePictureTooLarge(org.springframework.web.multipart.MaxUploadSizeExceededException ex) {
+        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(ErrorResponse.builder().timestamp(Instant.now())
+                .status(HttpStatus.PAYLOAD_TOO_LARGE.value()).message("Picture must be at most 5 MiB").build());
+    }
+
+    @ExceptionHandler(org.springframework.web.multipart.support.MissingServletRequestPartException.class)
+    public ResponseEntity<ErrorResponse> handleMissingPicture(org.springframework.web.multipart.support.MissingServletRequestPartException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ErrorResponse.builder().timestamp(Instant.now())
+                .status(HttpStatus.BAD_REQUEST.value()).message("A picture file is required").build());
+    }
+
     @ExceptionHandler(TripNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleTripNotFound(TripNotFoundException ex) {
         log.error("Trip not found: {}", ex.getMessage());

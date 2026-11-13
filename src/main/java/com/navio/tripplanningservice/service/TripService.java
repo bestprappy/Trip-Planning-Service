@@ -5,6 +5,7 @@ import com.navio.tripplanningservice.dto.TripResponse;
 import com.navio.tripplanningservice.dto.UpdateTripRequest;
 import com.navio.tripplanningservice.model.Trip;
 import com.navio.tripplanningservice.model.TripVisibility;
+import com.navio.tripplanningservice.repository.TripCoverRepository;
 import com.navio.tripplanningservice.repository.TripRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -13,6 +14,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -23,6 +25,7 @@ public class TripService {
 
     private final TripRepository tripRepository;
     private final com.navio.tripplanningservice.integration.mobility.MobilityPlaceClient placeClient;
+    private final TripCoverRepository coverRepository;
 
     @Transactional
     public TripResponse createTrip(UUID userId, CreateTripRequest request) {
@@ -37,20 +40,21 @@ public class TripService {
 
         applyDestination(trip, placeClient.getDetail(request.getDestinationId()));
         Trip savedTrip = tripRepository.save(trip);
-        return mapToResponse(savedTrip);
+        return mapToResponse(savedTrip, null);
     }
 
     public TripResponse getTripById(UUID tripId, UUID userId) {
         Trip trip = tripRepository.findByIdAndUserId(tripId, userId)
                 .orElseThrow(() -> new TripNotFoundException(tripId));
-        return mapToResponse(trip);
+        return mapToResponse(trip, coverRepository.findCoverId(tripId).orElse(null));
     }
 
     public Page<TripResponse> getUserTrips(UUID userId, Pageable pageable) {
         Page<Trip> trips = tripRepository.findByUserId(userId, pageable);
+        Map<UUID, UUID> covers = coverRepository.findCoverIds(trips.getContent().stream().map(Trip::getId).toList());
         return new PageImpl<>(
                 trips.getContent().stream()
-                        .map(this::mapToResponse)
+                        .map(trip -> mapToResponse(trip, covers.get(trip.getId())))
                         .collect(Collectors.toList()),
                 pageable,
                 trips.getTotalElements()
@@ -81,7 +85,7 @@ public class TripService {
         }
 
         Trip updatedTrip = tripRepository.save(trip);
-        return mapToResponse(updatedTrip);
+        return mapToResponse(updatedTrip, coverRepository.findCoverId(tripId).orElse(null));
     }
 
     @Transactional
@@ -105,7 +109,7 @@ public class TripService {
         return value == null || value.isBlank() ? null : value.trim();
     }
 
-    private TripResponse mapToResponse(Trip trip) {
+    private TripResponse mapToResponse(Trip trip, UUID coverMediaId) {
         return TripResponse.builder()
                 .id(trip.getId())
                 .displayName(trip.getDisplayName())
@@ -120,6 +124,7 @@ public class TripService {
                 .destinationRegion(trip.getDestinationRegion())
                 .destinationCountryCode(trip.getDestinationCountryCode())
                 .visibility(trip.getVisibility().toString())
+                .coverMediaId(coverMediaId)
                 .createdAt(trip.getCreatedAt())
                 .updatedAt(trip.getUpdatedAt())
                 .build();

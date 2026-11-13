@@ -46,6 +46,9 @@ public class TripResponse {
 
     private String visibility;
 
+    /** Current owner-uploaded cover, or null when the planner shows the destination photo. */
+    private UUID coverMediaId;
+
     private Instant createdAt;
 
     private Instant updatedAt;

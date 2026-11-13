@@ -2,6 +2,7 @@ package com.navio.tripplanningservice.service;
 
 import com.navio.tripplanningservice.dto.*;
 import com.navio.tripplanningservice.model.*;
+import com.navio.tripplanningservice.repository.TripCoverRepository;
 import com.navio.tripplanningservice.repository.TripRepository;
 import com.navio.tripplanningservice.integration.mobility.*;
 import org.junit.jupiter.api.Test;
@@ -18,6 +19,7 @@ import static org.assertj.core.api.Assertions.*;
 class TripServiceTests {
     @Mock TripRepository repository;
     @Mock MobilityPlaceClient places;
+    @Mock TripCoverRepository covers;
     @InjectMocks TripService service;
     private final UUID user = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private final UUID id = UUID.fromString("10000000-0000-4000-8000-000000000001");
@@ -76,5 +78,26 @@ class TripServiceTests {
         assertThat(TripResponse.builder().destinationCity("City").destinationCountry("Country").build().getTitle()).isEqualTo("Country");
         assertThat(TripResponse.builder().destinationCity("Singapore").build().getTitle()).isEqualTo("Singapore");
         assertThat(TripResponse.builder().build().getTitle()).isNull();
+    }
+
+    @Test void tripDetailsCarryTheCurrentCoverId() {
+        var cover = UUID.fromString("20000000-0000-4000-8000-000000000001");
+        var trip = Trip.builder().id(id).destinationId("old").visibility(TripVisibility.PRIVATE).build();
+        when(repository.findByIdAndUserId(id, user)).thenReturn(Optional.of(trip));
+        when(covers.findCoverId(id)).thenReturn(Optional.of(cover));
+        assertThat(service.getTripById(id, user).getCoverMediaId()).isEqualTo(cover);
+    }
+
+    @Test void tripListLooksUpCoversForTheWholePageAtOnce() {
+        var other = UUID.fromString("10000000-0000-4000-8000-000000000002");
+        var cover = UUID.fromString("20000000-0000-4000-8000-000000000001");
+        var page = org.springframework.data.domain.PageRequest.of(0, 20);
+        var first = Trip.builder().id(id).destinationId("a").visibility(TripVisibility.PRIVATE).build();
+        var second = Trip.builder().id(other).destinationId("b").visibility(TripVisibility.PRIVATE).build();
+        when(repository.findByUserId(user, page)).thenReturn(new org.springframework.data.domain.PageImpl<>(java.util.List.of(first, second), page, 2));
+        when(covers.findCoverIds(java.util.List.of(id, other))).thenReturn(java.util.Map.of(id, cover));
+        var result = service.getUserTrips(user, page).getContent();
+        assertThat(result).extracting(TripResponse::getCoverMediaId).containsExactly(cover, null);
+        verify(covers, never()).findCoverId(any());
     }
 }

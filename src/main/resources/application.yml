@@ -3,6 +3,10 @@ spring:
     name: trip-planning-service
   config:
     import: configserver:${CONFIG_SERVER_URL:http://localhost:8888}
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
   cache:
     cache-names: currencyRates
     caffeine:
