@@ -92,7 +92,7 @@ class PlanFeedbackPostgresTests {
     }
     @Test void commentsRepliesEditsAndTombstonesArePersistentAndScoped(){
         service.add(token,user,new CommentRequest("Hello <script>alert(1)</script>","Traveler",null));
-        var root=service.comments(token,user,null,0).content().getFirst();assertThat(root.canEdit()).isTrue();
+        var root=service.comments(token,user,null,0).content().getFirst();assertThat(root.canEdit()).isTrue();assertThat(root.authorId()).isEqualTo(user.toString());
         assertThat(service.comments(token,other,null,0).content().getFirst().canEdit()).isFalse();
         assertThatThrownBy(()->service.edit(token,other,root.id(),new EditRequest("stolen",0))).isInstanceOf(PlanFeedbackService.FeedbackException.class);
         assertThatThrownBy(()->service.delete(token,other,root.id())).isInstanceOf(PlanFeedbackService.FeedbackException.class);
@@ -103,7 +103,7 @@ class PlanFeedbackPostgresTests {
         assertThatThrownBy(()->service.add(token,user,new CommentRequest("deep",null,reply.id()))).isInstanceOf(PlanFeedbackService.FeedbackException.class);
         assertThatThrownBy(()->service.add(token,user,new CommentRequest("bad",null,UUID.randomUUID()))).isInstanceOf(PlanFeedbackService.FeedbackException.class);
         service.delete(token,owner,root.id());service.delete(token,owner,root.id());
-        var tombstone=service.comments(token,null,null,0).content().getFirst();assertThat(tombstone.deleted()).isTrue();assertThat(tombstone.content()).isNull();assertThat(tombstone.authorName()).isNull();assertThat(tombstone.replyCount()).isEqualTo(1);
+        var tombstone=service.comments(token,null,null,0).content().getFirst();assertThat(tombstone.deleted()).isTrue();assertThat(tombstone.content()).isNull();assertThat(tombstone.authorName()).isNull();assertThat(tombstone.authorId()).isNull();assertThat(tombstone.replyCount()).isEqualTo(1);
         assertThat(service.summary(token,null).commentCount()).isEqualTo(1);
         assertThat(service.comments(token,null,root.id(),0).content()).hasSize(1);
         assertThatThrownBy(()->service.add(token,other,new CommentRequest("closed",null,root.id()))).isInstanceOf(PlanFeedbackService.FeedbackException.class);

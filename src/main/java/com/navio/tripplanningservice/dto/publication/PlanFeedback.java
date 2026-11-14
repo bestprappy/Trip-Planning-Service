@@ -19,7 +19,9 @@ public final class PlanFeedback {
         public Summary(Double average,long ratings,long comments,Integer mine,boolean publisher){this(average,ratings,comments,mine,publisher,0,0);}
     }
     public record Comment(UUID id, UUID parentId, String authorName, String content, boolean deleted,
-            Instant createdAt, Instant updatedAt, int version, boolean canEdit, boolean canDelete, long replyCount) {}
+            Instant createdAt, Instant updatedAt, int version, boolean canEdit, boolean canDelete, long replyCount,
+            /** Sign-in subject of the author, used to link their public profile; null once the comment is removed. */
+            String authorId) {}
     public record Comments(List<Comment> content, boolean hasMore, long total, int page) {}
     public record Report(UUID commentId, String content, long reportCount) {}
 }

@@ -91,7 +91,7 @@ public class PlanFeedbackRepository {
         boolean deleted=r.getBoolean("deleted"),self=Objects.equals(viewer,r.getObject("user_id",UUID.class));
         return new Comment(r.getObject("id",UUID.class),r.getObject("parent_id",UUID.class),deleted?null:r.getString("author_name"),
             deleted?null:r.getString("content"),deleted,r.getTimestamp("created_at").toInstant(),r.getTimestamp("updated_at").toInstant(),
-            r.getInt("version"),self&&!deleted,(self||owner)&&!deleted,r.getLong("reply_count"));
+            r.getInt("version"),self&&!deleted,(self||owner)&&!deleted,r.getLong("reply_count"),deleted?null:r.getObject("user_id",UUID.class).toString());
     }
     public void report(UUID id,UUID user,Reason reason) {
         db.sql("INSERT INTO trip.plan_comment_report(comment_id,reporter_id,reason) VALUES(:id,:u,:reason) ON CONFLICT DO NOTHING")
