@@ -17,6 +17,9 @@ public class PlanFeedbackController {
     @GetMapping public ResponseEntity<Summary> summary(@PathVariable String token,@RequestHeader(value="X-User-Id",required=false) UUID user) {
         return read(feedback.summary(token,user));
     }
+    @PostMapping("/view") public ResponseEntity<Void> view(@PathVariable String token,@RequestHeader(value="X-User-Id",required=false) UUID user,@Valid @RequestBody ViewRequest request) {
+        feedback.recordView(token,user,request.readId());return ResponseEntity.noContent().cacheControl(CacheControl.noStore()).build();
+    }
     @PutMapping("/rating") public ResponseEntity<Summary> rate(@PathVariable String token,@RequestHeader("X-User-Id") UUID user,@Valid @RequestBody RatingRequest request) {
         return read(feedback.rate(token,user,request.score()));
     }

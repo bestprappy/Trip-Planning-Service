@@ -23,6 +23,20 @@ public class PlanFeedbackRepository {
             .param("token",token).param("sanitizer",sanitizer)
             .query((r,n)->new Publication(r.getObject(1,UUID.class),r.getObject(2,UUID.class),r.getLong(3),r.getLong(4),r.getLong(5))).optional();
     }
+    public long totalViews(UUID p){return db.sql("SELECT view_count FROM trip.trip_publication WHERE id=:p").param("p",p).query(Long.class).single();}
+    public long uniqueViews(UUID p){return db.sql("SELECT count(*) FROM trip.publication_account_viewer WHERE publication_id=:p").param("p",p).query(Long.class).single();}
+    public void recordView(UUID p,UUID user,UUID readId){
+        int added=db.sql("INSERT INTO trip.publication_read_receipt(publication_id,read_id) VALUES(:p,:r) ON CONFLICT DO NOTHING").param("p",p).param("r",readId).update();
+        if(added>0){
+            db.sql("UPDATE trip.trip_publication SET view_count=view_count+1 WHERE id=:p").param("p",p).update();
+            db.sql("""
+                INSERT INTO trip.publication_daily_activity(publication_id,activity_day,views)
+                VALUES(:p,(now() AT TIME ZONE 'UTC')::date,1)
+                ON CONFLICT(publication_id,activity_day) DO UPDATE SET views=publication_daily_activity.views+1
+                """).param("p",p).update();
+        }
+        if(user!=null)db.sql("INSERT INTO trip.publication_account_viewer(publication_id,user_id) VALUES(:p,:u) ON CONFLICT DO NOTHING").param("p",p).param("u",user).update();
+    }
     public Integer rating(UUID publication, UUID user) {
         if(user==null)return null;
         return db.sql("SELECT score FROM trip.plan_rating WHERE publication_id=:p AND user_id=:u")

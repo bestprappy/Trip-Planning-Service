@@ -71,8 +71,8 @@ class PostgresSchemaTests {
                 // V24 profile pins, V25 the trip.events.v1 outbox, and V26 saved station evidence.
                 // V27 persisted feedback and V28 daily discovery activity are additive too,
                 // as are V29's per-browser viewer ledger and V30's trip cover pictures.
-                // V31 adds anonymous place-popularity preferences without altering planner rows.
-                assertThat(upgraded.migrate().migrationsExecuted).isEqualTo(18);
+                // V31 adds anonymous place-popularity preferences; V32 adds read and account ledgers.
+                assertThat(upgraded.migrate().migrationsExecuted).isEqualTo(19);
                 upgraded.validate();
                 try (var connection = java.sql.DriverManager.getConnection(upgradeUrl, username, password);
                      var sql = connection.createStatement(); var row = sql.executeQuery("SELECT count(*) FROM trip.shared_plan_copy WHERE publication_id='33333333-3333-4333-8333-333333333333'")) {

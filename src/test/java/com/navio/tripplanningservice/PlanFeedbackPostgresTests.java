@@ -13,9 +13,45 @@ import java.util.*;
 import java.util.concurrent.*;
 import static org.assertj.core.api.Assertions.*;
 
-@SpringBootTest
+@org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest(properties={
+ "spring.config.name=reader-postgres-test", "spring.cloud.config.enabled=false",
+ "spring.datasource.url=${NAVIO_TEST_DB_URL}","spring.datasource.username=${NAVIO_TEST_DB_USERNAME:navio_verify}",
+ "spring.datasource.password=${NAVIO_TEST_DB_PASSWORD:navio_verify}","spring.datasource.driver-class-name=org.postgresql.Driver",
+ "spring.flyway.enabled=true","spring.flyway.locations=classpath:db/migration","spring.flyway.schemas=trip",
+ "spring.flyway.default-schema=trip","spring.flyway.create-schemas=true","spring.jpa.hibernate.ddl-auto=validate"
+})
+@org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase(replace=org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase.Replace.NONE)
+@org.springframework.context.annotation.Import({PlanFeedbackService.class,com.navio.tripplanningservice.repository.PlanFeedbackRepository.class})
+@org.springframework.transaction.annotation.Transactional(propagation=org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
 @EnabledIfEnvironmentVariable(named="NAVIO_TEST_DB_URL",matches=".+")
 class PlanFeedbackPostgresTests {
+    @Test void concurrentReadRetriesPreserveHistoricalTotalsAndActivity() throws Exception {
+        db.sql("UPDATE trip.trip_publication SET view_count=42 WHERE id=:p").param("p",publication).update();
+        UUID read=UUID.randomUUID();
+        try(var executor=Executors.newFixedThreadPool(4)) {
+            var jobs=new ArrayList<Future<?>>();
+            for(int i=0;i<12;i++)jobs.add(executor.submit(()->service.recordView(token,user,read)));
+            for(var job:jobs)job.get(20,TimeUnit.SECONDS);
+        }
+        assertThat(service.summary(token,user).viewCount()).isEqualTo(43);
+        assertThat(service.summary(token,user).uniqueViewCount()).isEqualTo(1);
+        assertThat(db.sql("SELECT sum(views) FROM trip.publication_daily_activity WHERE publication_id=:p").param("p",publication).query(Long.class).single()).isEqualTo(1);
+    }
+    @Test void visibleReadsCountEveryOpeningButSignedInAccountsOnlyOnce() {
+        UUID read=UUID.randomUUID();
+        service.recordView(token,user,read);service.recordView(token,user,read);
+        service.recordView(token,user,UUID.randomUUID());service.recordView(token,null,UUID.randomUUID());
+        service.recordView(token,other,UUID.randomUUID());
+        var actual=service.summary(token,null);
+        assertThat(actual.viewCount()).isEqualTo(4);assertThat(actual.uniqueViewCount()).isEqualTo(2);
+    }
+    @Test void readRetryMayAttachAccountWithoutIncrementingTotalAndUnlistedPlansRejectIt() {
+        UUID read=UUID.randomUUID();service.recordView(token,null,read);service.recordView(token,user,read);
+        assertThat(service.summary(token,user).viewCount()).isEqualTo(1);
+        assertThat(service.summary(token,user).uniqueViewCount()).isEqualTo(1);
+        db.sql("UPDATE trip.trip_publication SET listed_in_explore=false WHERE id=:id").param("id",publication).update();
+        assertThatThrownBy(()->service.recordView(token,user,UUID.randomUUID())).isInstanceOf(TripPublicationService.SharedPlanUnavailableException.class);
+    }
     @Autowired PlanFeedbackService service;
     @Autowired JdbcClient db;
     UUID owner,user,other,trip,publication;

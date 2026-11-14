@@ -21,7 +21,12 @@ public class PlanFeedbackService {
     public Summary summary(String token,UUID user) {
         Publication p=require(token,false);
         return new Summary(p.ratingCount()==0?null:(double)p.ratingSum()/p.ratingCount(),p.ratingCount(),p.commentCount(),
-            repository.rating(p.id(),user),Objects.equals(user,p.owner()));
+            repository.rating(p.id(),user),Objects.equals(user,p.owner()),repository.totalViews(p.id()),repository.uniqueViews(p.id()));
+    }
+    @Transactional public void recordView(String token,UUID user,UUID readId) {
+        if(readId==null)throw new FeedbackException(400,"A valid read request is required.");
+        Publication p=require(token,true);
+        repository.recordView(p.id(),user,readId);
     }
     @Transactional public Summary rate(String token,UUID user,Integer score) {
         authenticated(user);Publication p=require(token,true);

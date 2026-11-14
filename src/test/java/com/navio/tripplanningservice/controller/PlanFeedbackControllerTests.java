@@ -14,6 +14,15 @@ import static org.mockito.Mockito.verifyNoInteractions;
 class PlanFeedbackControllerTests {
     @Autowired MockMvc mvc;
     @MockitoBean PlanFeedbackService feedback;
+    @Test void validatesReadEventsAndAllowsAnonymousReaders() throws Exception {
+        String read="00000000-0000-4000-8000-000000000001";
+        mvc.perform(post("/v1/shared-plans/token/feedback/view").contentType("application/json").content("{}"))
+            .andExpect(status().isBadRequest());
+        verifyNoInteractions(feedback);
+        mvc.perform(post("/v1/shared-plans/token/feedback/view").contentType("application/json").content("{\"readId\":\""+read+"\"}"))
+            .andExpect(status().isNoContent());
+        org.mockito.Mockito.verify(feedback).recordView("token",null,java.util.UUID.fromString(read));
+    }
     @Test void mappedFeedbackErrorsRetainTheirStatusAndSafeMessage() throws Exception {
         for(int code:new int[]{400,401,403,404,409}){
             org.mockito.Mockito.when(feedback.summary(org.mockito.ArgumentMatchers.eq("token"),org.mockito.ArgumentMatchers.isNull()))
