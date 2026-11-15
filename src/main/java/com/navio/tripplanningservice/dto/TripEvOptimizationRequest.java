@@ -40,7 +40,12 @@ public record TripEvOptimizationRequest(
 
     public record EnergyModel(
             @NotBlank @jakarta.validation.constraints.Pattern(regexp="CONSUMPTION|RATED_RANGE|UNAVAILABLE") String modelKind,
-            @Positive Double consumptionKwhPer100km, @Positive Double usableBatteryCapacityKwh, @Positive Double ratedRangeKm) {}
+            @Positive Double consumptionKwhPer100km, @Positive Double usableBatteryCapacityKwh, @Positive Double ratedRangeKm,
+            @jakarta.validation.constraints.Pattern(regexp="MANUFACTURER_REPORTED|REGULATORY_REPORTED|USER_OBSERVED|UNKNOWN") String consumptionSource) {
+        public EnergyModel(String modelKind, Double consumptionKwhPer100km, Double usableBatteryCapacityKwh, Double ratedRangeKm) {
+            this(modelKind, consumptionKwhPer100km, usableBatteryCapacityKwh, ratedRangeKm, null);
+        }
+    }
 
     public record Vehicle(
             @PositiveOrZero Double batteryKwh,

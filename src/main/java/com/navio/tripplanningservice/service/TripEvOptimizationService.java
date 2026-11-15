@@ -78,6 +78,7 @@ public class TripEvOptimizationService {
         var input = buildMobilityRequest(trip, request);
         requireCurrentVersion(tripId, userId, version);
         MobilityEvOptimizationResponse response = mobilityClient.optimize(input.request());
+        requireEnergyPolicy(input.request().vehicle().energyModel(), response);
         requireCurrentVersion(tripId, userId, version);
         return mapPreview(version, response, input.laterDaysUnchecked());
     }
@@ -98,6 +99,7 @@ public class TripEvOptimizationService {
         var input = buildMobilityRequest(trip, request);
         requireCurrentVersion(tripId, userId, request.expectedVersion());
         MobilityEvOptimizationResponse response = mobilityClient.optimize(input.request());
+        requireEnergyPolicy(input.request().vehicle().energyModel(), response);
         if (!response.feasible()) {
             throw new TripEvOptimizationException(response.message());
         }
@@ -112,6 +114,14 @@ public class TripEvOptimizationService {
                 response
         );
         return plannerService.getPlannerSnapshot(tripId, userId);
+    }
+
+    private static void requireEnergyPolicy(TripEvOptimizationRequest.EnergyModel model, MobilityEvOptimizationResponse response) {
+        boolean adjusted = "RATED_RANGE".equals(model.modelKind()) || "MANUFACTURER_REPORTED".equals(model.consumptionSource())
+                || "REGULATORY_REPORTED".equals(model.consumptionSource());
+        if (adjusted && !"navio-energy-v2".equals(response.energyPolicyVersion())) {
+            throw new MobilityOptimizationUnavailableException("Charging planning needs the real-world energy update. Please try again after the service update.");
+        }
     }
 
     private record OptimizationInput(MobilityEvOptimizationRequest request, boolean laterDaysUnchecked) {

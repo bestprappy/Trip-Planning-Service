@@ -320,7 +320,7 @@ class TripEvOptimizationServiceTest {
                         11.0,
                         180.0,
                         List.of("CCS2"),
-                        new TripEvOptimizationRequest.EnergyModel("CONSUMPTION", 18.0, 75.0, null)
+                        new TripEvOptimizationRequest.EnergyModel("CONSUMPTION", 18.0, 75.0, null, "USER_OBSERVED")
                 ),
                 80.0,
                 12.0,
@@ -455,6 +455,21 @@ class TripEvOptimizationServiceTest {
         verify(f.applier).apply(any(), any(), any(), org.mockito.ArgumentMatchers.anyLong(), any());
         verify(f.mobilityClient, org.mockito.Mockito.times(2)).optimize(org.mockito.ArgumentMatchers.argThat(input ->
                 "RATED_RANGE".equals(input.vehicle().energyModel().modelKind())));
+    }
+
+    @Test
+    void anOlderMobilityCannotSilentlyReturnAnUnadjustedFactoryPlan() {
+        var f = fixture();
+        f.trip.setEnergyVehicleSnapshot(Map.of("profile", Map.of("modelKind", "RATED_RANGE", "ratedRangeKm", 480,
+                "usableBatteryCapacityKwh", 60), "connectorTypes", List.of("CCS2")));
+        var old = mobilityResponse();
+        when(f.mobilityClient.optimize(any())).thenReturn(new MobilityEvOptimizationResponse(old.blockId(), old.feasible(),
+                old.operations(), old.finalSocPct(), old.totalDrivingSeconds(), old.totalChargingMinutes(), old.message(), old.warnings(), null));
+        assertThatThrownBy(() -> f.service.preview(f.tripId, f.userId, request(4L)))
+                .isInstanceOf(MobilityOptimizationUnavailableException.class).hasMessageContaining("real-world energy update");
+        assertThatThrownBy(() -> f.service.apply(f.tripId, f.userId, request(4L)))
+                .isInstanceOf(MobilityOptimizationUnavailableException.class);
+        verifyNoInteractions(f.applier);
     }
 
     @Test
