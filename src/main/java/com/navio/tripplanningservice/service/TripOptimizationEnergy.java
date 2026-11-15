@@ -40,7 +40,8 @@ final class TripOptimizationEnergy {
         Double modelConsumption = "CONSUMPTION".equals(kind) ? consumption : null;
         return new MobilityEvOptimizationRequest.Vehicle(capacity, modelConsumption,
                 positive(snapshot, "maxAcKw"), positive(snapshot, "maxDcKw"), connectors,
-                new TripEvOptimizationRequest.EnergyModel(kind, modelConsumption, capacity, "RATED_RANGE".equals(kind) ? range : null));
+                new TripEvOptimizationRequest.EnergyModel(kind, modelConsumption, capacity, "RATED_RANGE".equals(kind) ? range : null,
+                        profile.path("consumptionSource").asText("UNKNOWN")));
     }
 
     private static Double declaredCapacity(Trip trip, String vehicleId) {

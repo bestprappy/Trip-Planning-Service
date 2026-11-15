@@ -40,6 +40,14 @@ class TripOptimizationEnergyTests {
         assertThat(vehicle.energyModel().modelKind()).isEqualTo("RATED_RANGE");
         assertThat(vehicle.energyModel().ratedRangeKm()).isEqualTo(480.0);
     }
+    @Test void consumptionProvenanceReachesMobilityWithoutChangingTheFactoryFigure() {
+        for (String source : List.of("MANUFACTURER_REPORTED", "REGULATORY_REPORTED", "USER_OBSERVED", "UNKNOWN")) {
+            var vehicle = TripOptimizationEnergy.vehicle(trip("CATALOG_DEFAULT", source, false));
+            assertThat(vehicle.energyModel().consumptionSource()).isEqualTo(source);
+            assertThat(vehicle.energyModel().consumptionKwhPer100km()).isEqualTo(18.125);
+            assertThat(vehicle.energyModel().usableBatteryCapacityKwh()).isEqualTo(60);
+        }
+    }
     @Test void aMissingUsableCapacityFallsBackToTheTripVehiclesDeclaredBattery() {
         var trip = navioEstimate(null);
         trip.setTripVehicles(List.of(Map.of("scope","account","vehicle",Map.of("id",VEHICLE_ID,"batteryCapacityKwh",77.4))));

@@ -414,7 +414,7 @@ public class PlannerService {
                 blocks,
                 budget,
                 trip.getVersion(),
-                trip.getUpdatedAt(), List.of("day-destinations", "charge-targets", "day-anchors", "trip-energy-v1", "observed-soc-v1", "trip-garage-v1", "canonical-optimization-v1", "day-auto-add-v1", "leg-travel-mode-v1", "cycling-legs-v1", "transit-preferences-v1", "transit-route-choice-v1", "precise-charging-v1", "time-source-v1", "item-schedule-v1", "publication-sections-v1", "trip-vehicles-v1", "day-sections-v1"),
+                trip.getUpdatedAt(), List.of("real-world-energy-v2", "day-destinations", "charge-targets", "day-anchors", "trip-energy-v1", "observed-soc-v1", "trip-garage-v1", "canonical-optimization-v1", "day-auto-add-v1", "leg-travel-mode-v1", "cycling-legs-v1", "transit-preferences-v1", "transit-route-choice-v1", "precise-charging-v1", "time-source-v1", "item-schedule-v1", "publication-sections-v1", "trip-vehicles-v1", "day-sections-v1"),
                 PlannerEnergyState.read(trip));
     }
 
