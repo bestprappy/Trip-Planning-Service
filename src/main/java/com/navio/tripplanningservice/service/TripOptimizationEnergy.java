@@ -7,14 +7,18 @@ import com.navio.tripplanningservice.integration.mobility.MobilityEvOptimization
 import com.navio.tripplanningservice.model.Trip;
 
 import java.util.ArrayList;
-import java.util.List;
 
 /** Resolve calculation inputs from the owned, saved trip, never request-supplied specifications. */
 final class TripOptimizationEnergy {
     private static final JsonMapper JSON = JsonMapper.builder().build();
     private TripOptimizationEnergy() {}
 
-    static MobilityEvOptimizationRequest.Vehicle vehicle(Trip trip, boolean applying) {
+    /**
+     * Any saved energy model that can predict the battery may plan charging: the traveller's own average,
+     * the catalogue figure, or the NAVIO Estimate from rated range. Without a usable capacity the
+     * vehicle's declared battery size stands in, because a charge time cannot be computed from nothing.
+     */
+    static MobilityEvOptimizationRequest.Vehicle vehicle(Trip trip) {
         if (trip.getEnergyVehicleSnapshot() == null) {
             throw new TripEvOptimizationException("Select and save a vehicle for this trip before optimizing");
         }
@@ -22,41 +26,50 @@ final class TripOptimizationEnergy {
         JsonNode profile = snapshot.path("profile");
         String kind = profile.path("modelKind").asText();
         Double consumption = positive(profile, "consumptionKwhPer100km");
-        Double capacity = positive(profile, "usableBatteryCapacityKwh");
         Double range = positive(profile, "ratedRangeKm");
-        if (!("CONSUMPTION".equals(kind) && consumption != null && capacity != null)
-                && !("RATED_RANGE".equals(kind) && range != null)) {
-            throw new TripEvOptimizationException("The saved vehicle has insufficient data for battery predictions; confirm consumption and usable capacity or choose a rated-range preview");
-        }
-        if (applying) {
-            if (!"CONSUMPTION".equals(kind)) {
-                throw new TripEvOptimizationException("Rated-range estimates are preview-only and cannot apply automatic charging stops");
-            }
-            String selection = profile.path("selectionMode").asText();
-            String source = profile.path("consumptionSource").asText();
-            boolean eligible = switch (selection) {
-                case "LEGACY_UNCONFIRMED" -> snapshot.path("legacyConsumptionConfirmed").asBoolean(false);
-                case "USER_OVERRIDE" -> "USER_OBSERVED".equals(source);
-                case "CATALOG_DEFAULT" -> List.of("MANUFACTURER_REPORTED", "REGULATORY_REPORTED").contains(source)
-                        && "BATTERY_SIDE".equals(profile.path("consumptionMeasurementBasis").asText())
-                        && profile.path("sourceUrl").asText("").startsWith("https://");
-                default -> false;
-            };
-            if (!eligible) throw new TripEvOptimizationException("Confirm the saved vehicle energy selection before applying automatic charging stops");
+        Double capacity = positive(profile, "usableBatteryCapacityKwh");
+        if (capacity == null) capacity = declaredCapacity(trip, snapshot.path("vehicleId").asText(null));
+        boolean predictable = ("CONSUMPTION".equals(kind) && consumption != null)
+                || ("RATED_RANGE".equals(kind) && range != null);
+        if (!predictable || capacity == null) {
+            throw new TripEvOptimizationException("The saved vehicle has insufficient data for battery predictions. Choose an Energy Consumption option in vehicle settings and save");
         }
         var connectors = new ArrayList<String>();
         snapshot.path("connectorTypes").forEach(value -> connectors.add(value.asText()));
         if (connectors.isEmpty()) connectors.add("OTHER");
-        return new MobilityEvOptimizationRequest.Vehicle(capacity, "CONSUMPTION".equals(kind) ? consumption : null,
+        Double modelConsumption = "CONSUMPTION".equals(kind) ? consumption : null;
+        return new MobilityEvOptimizationRequest.Vehicle(capacity, modelConsumption,
                 positive(snapshot, "maxAcKw"), positive(snapshot, "maxDcKw"), connectors,
-                new TripEvOptimizationRequest.EnergyModel(kind, "CONSUMPTION".equals(kind) ? consumption : null, capacity, range));
+                new TripEvOptimizationRequest.EnergyModel(kind, modelConsumption, capacity, "RATED_RANGE".equals(kind) ? range : null));
     }
 
-    static double initialSoc(Trip trip) {
-        if (trip.getInitialSocPct() == null) {
-            throw new TripEvOptimizationException("Set and save the trip starting battery before optimizing; an assumed garage value is not a confirmed trip state");
+    private static Double declaredCapacity(Trip trip, String vehicleId) {
+        JsonNode vehicle = tripVehicle(trip, vehicleId);
+        return vehicle == null ? null : positive(vehicle, "batteryCapacityKwh");
+    }
+
+    private static JsonNode tripVehicle(Trip trip, String vehicleId) {
+        if (vehicleId == null || trip.getTripVehicles() == null) return null;
+        for (var entry : trip.getTripVehicles()) {
+            JsonNode vehicle = JSON.valueToTree(entry).path("vehicle");
+            if (vehicleId.equals(vehicle.path("id").asText())) return vehicle;
         }
-        return trip.getInitialSocPct().doubleValue();
+        return null;
+    }
+
+    /**
+     * The battery the planner shows the trip starting with: the trip's own value, or else the selected
+     * vehicle's starting battery, as the planner and published garage both fall back to.
+     */
+    static double initialSoc(Trip trip) {
+        if (trip.getInitialSocPct() != null) return trip.getInitialSocPct().doubleValue();
+        JsonNode vehicle = tripVehicle(trip, trip.getEnergyVehicleSnapshot() == null ? null
+                : JSON.valueToTree(trip.getEnergyVehicleSnapshot()).path("vehicleId").asText(null));
+        JsonNode starting = vehicle == null ? null : vehicle.path("settings").path("startingBatteryPct");
+        if (starting != null && starting.isNumber() && starting.doubleValue() >= 0 && starting.doubleValue() <= 100) {
+            return starting.doubleValue();
+        }
+        throw new TripEvOptimizationException("Set the trip starting battery in My garage before planning charging stops");
     }
 
     private static Double positive(JsonNode node, String field) {

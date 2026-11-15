@@ -75,7 +75,7 @@ public class TripEvOptimizationService {
         Trip trip = requireOwnedTrip(tripId, userId);
         checkVersion(trip, request);
         long version = trip.getVersion();
-        var input = buildMobilityRequest(trip, request, false);
+        var input = buildMobilityRequest(trip, request);
         requireCurrentVersion(tripId, userId, version);
         MobilityEvOptimizationResponse response = mobilityClient.optimize(input.request());
         requireCurrentVersion(tripId, userId, version);
@@ -95,7 +95,7 @@ public class TripEvOptimizationService {
             throw new ObjectOptimisticLockingFailureException(Trip.class, tripId);
         }
 
-        var input = buildMobilityRequest(trip, request, true);
+        var input = buildMobilityRequest(trip, request);
         requireCurrentVersion(tripId, userId, request.expectedVersion());
         MobilityEvOptimizationResponse response = mobilityClient.optimize(input.request());
         if (!response.feasible()) {
@@ -119,11 +119,10 @@ public class TripEvOptimizationService {
 
     private OptimizationInput buildMobilityRequest(
             Trip trip,
-            TripEvOptimizationRequest request,
-            boolean applying
+            TripEvOptimizationRequest request
     ) {
         UUID tripId = trip.getId();
-        var vehicle = TripOptimizationEnergy.vehicle(trip, applying);
+        var vehicle = TripOptimizationEnergy.vehicle(trip);
         ListBlock block = listBlockRepository.findByTripIdAndClientId(tripId, request.blockId())
                 .orElseThrow(() -> new TripEvOptimizationException("The selected itinerary block was not found"));
         List<ListBlock> days = listBlockRepository.findByTripIdOrderByDisplayOrder(tripId).stream()

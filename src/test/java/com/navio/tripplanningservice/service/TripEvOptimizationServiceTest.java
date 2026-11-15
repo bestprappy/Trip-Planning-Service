@@ -445,15 +445,16 @@ class TripEvOptimizationServiceTest {
     }
 
     @Test
-    void ratedRangeCanPreviewButCannotApplyEvenWithForgedDirectRequest() {
+    void aNavioEstimateWithABatterySizeCanPreviewAndApplyChargingStops() {
         var f = fixture();
-        f.trip.setEnergyVehicleSnapshot(Map.of("profile", Map.of("modelKind", "RATED_RANGE", "ratedRangeKm", 480), "connectorTypes", List.of("CCS2")));
+        f.trip.setEnergyVehicleSnapshot(Map.of("profile", Map.of("modelKind", "RATED_RANGE", "ratedRangeKm", 480,
+                "usableBatteryCapacityKwh", 60), "connectorTypes", List.of("CCS2")));
         when(f.mobilityClient.optimize(any())).thenReturn(mobilityResponse());
         f.service.preview(f.tripId, f.userId, request(null));
-        assertThatThrownBy(() -> f.service.apply(f.tripId, f.userId, request(4L)))
-                .isInstanceOf(TripEvOptimizationException.class).hasMessageContaining("preview-only");
-        verifyNoInteractions(f.applier);
-        verify(f.mobilityClient).optimize(any());
+        f.service.apply(f.tripId, f.userId, request(4L));
+        verify(f.applier).apply(any(), any(), any(), org.mockito.ArgumentMatchers.anyLong(), any());
+        verify(f.mobilityClient, org.mockito.Mockito.times(2)).optimize(org.mockito.ArgumentMatchers.argThat(input ->
+                "RATED_RANGE".equals(input.vehicle().energyModel().modelKind())));
     }
 
     @Test
