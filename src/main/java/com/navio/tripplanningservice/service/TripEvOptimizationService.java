@@ -101,6 +101,9 @@ public class TripEvOptimizationService {
         if (!response.feasible()) {
             throw new TripEvOptimizationException(response.message());
         }
+        if (Boolean.TRUE.equals(request.insertionOnly()) && response.operations().stream().anyMatch(op -> !"ADD_CHARGER".equals(op.type()) || op.departureSocPct() != 100)) {
+            throw new TripEvOptimizationException("Auto Add must preserve existing stops and charge new stops to 100%");
+        }
         optimizationApplier.apply(
                 tripId,
                 userId,
@@ -138,7 +141,7 @@ public class TripEvOptimizationService {
         List<MobilityEvOptimizationRequest.Day> following = replayableDays(tripId, laterDays);
         return new OptimizationInput(new MobilityEvOptimizationRequest(request.blockId(), stops, vehicle,
                 TripOptimizationEnergy.initialSoc(trip), request.effectiveReserveSocPct(),
-                request.effectiveTargetSocPct(), request.effectiveMaximumDetourKm(), preceding, following),
+                Boolean.TRUE.equals(request.insertionOnly()) ? 100.0 : request.effectiveTargetSocPct(), request.effectiveMaximumDetourKm(), preceding, following, request.insertionOnly(), request.minimumArrivalSocPct()),
                 following.size() < laterDays.size());
     }
 

@@ -16,11 +16,16 @@ public record TripEvOptimizationRequest(
         @NotBlank @Size(max = 160) String blockId,
         @NotNull @Valid Vehicle vehicle,
         @NotNull @DecimalMin("0.0") @DecimalMax("100.0") Double startingSocPct,
-        @DecimalMin("1.0") @DecimalMax("40.0") Double reserveSocPct,
-        @DecimalMin("20.0") @DecimalMax("95.0") Double targetSocPct,
+        @DecimalMin("1.0") @DecimalMax("100.0") Double reserveSocPct,
+        @DecimalMin("20.0") @DecimalMax("100.0") Double targetSocPct,
         @DecimalMin("1.0") @DecimalMax("50.0") Double maximumDetourKm,
-        @PositiveOrZero Long expectedVersion
+        @PositiveOrZero Long expectedVersion,
+        Boolean insertionOnly,
+        @DecimalMin("1.0") @DecimalMax("100.0") Double minimumArrivalSocPct
 ) {
+    public TripEvOptimizationRequest(String blockId, Vehicle vehicle, Double startingSocPct, Double reserveSocPct, Double targetSocPct, Double maximumDetourKm, Long expectedVersion) {
+        this(blockId, vehicle, startingSocPct, reserveSocPct, targetSocPct, maximumDetourKm, expectedVersion, false, null);
+    }
     public double effectiveReserveSocPct() {
         return reserveSocPct == null ? 12 : reserveSocPct;
     }

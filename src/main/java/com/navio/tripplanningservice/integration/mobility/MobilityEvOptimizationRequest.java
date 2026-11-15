@@ -11,8 +11,14 @@ public record MobilityEvOptimizationRequest(
         double targetSocPct,
         double maximumDetourKm,
         List<Day> precedingDays,
-        List<Day> followingDays
+        List<Day> followingDays,
+        Boolean insertionOnly,
+        Double minimumArrivalSocPct
 ) {
+    public MobilityEvOptimizationRequest(String blockId, List<Stop> stops, Vehicle vehicle,
+            double startingSocPct, double reserveSocPct, double targetSocPct, double maximumDetourKm, List<Day> precedingDays, List<Day> followingDays) {
+        this(blockId, stops, vehicle, startingSocPct, reserveSocPct, targetSocPct, maximumDetourKm, precedingDays, followingDays, false, null);
+    }
     public MobilityEvOptimizationRequest(String blockId, List<Stop> stops, Vehicle vehicle, double startingSocPct,
             double reserveSocPct, double targetSocPct, double maximumDetourKm, List<Day> precedingDays) {
         this(blockId, stops, vehicle, startingSocPct, reserveSocPct, targetSocPct, maximumDetourKm, precedingDays, List.of());

@@ -474,4 +474,22 @@ class TripEvOptimizationServiceTest {
                 .isInstanceOf(TripEvOptimizationException.class).hasMessageContaining("incomplete specifications");
         verifyNoInteractions(f.mobilityClient);
     }
+    @Test
+    void insertionOnlyForwardsPreferencesAndRejectsDestructiveMobilityOperations() {
+        var f = fixture();
+        var base = request(4L);
+        var insertion = new TripEvOptimizationRequest(base.blockId(), base.vehicle(), base.startingSocPct(),
+                33.0, 70.0, base.maximumDetourKm(), 4L, true, 44.0);
+        when(f.mobilityClient.optimize(any())).thenReturn(mobilityResponse());
+        assertThatThrownBy(() -> f.service.apply(f.tripId, f.userId, insertion))
+                .isInstanceOf(TripEvOptimizationException.class).hasMessageContaining("preserve existing stops");
+        verifyNoInteractions(f.applier);
+        var sent = ArgumentCaptor.forClass(MobilityEvOptimizationRequest.class);
+        verify(f.mobilityClient).optimize(sent.capture());
+        assertThat(sent.getValue().insertionOnly()).isTrue();
+        assertThat(sent.getValue().targetSocPct()).isEqualTo(100);
+        assertThat(sent.getValue().reserveSocPct()).isEqualTo(33);
+        assertThat(sent.getValue().minimumArrivalSocPct()).isEqualTo(44);
+    }
+
 }
