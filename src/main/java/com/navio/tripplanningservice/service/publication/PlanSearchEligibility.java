@@ -5,7 +5,7 @@ import java.util.*;
 final class PlanSearchEligibility {
  /** Catalogue retrieval keeps hard constraints, then admits partial topical evidence as Relevant. */
  static PlanSearchQuery.Match catalogue(SearchIntent intent,PublicSearchEvidence item,int dayCount){
-  if(!CatalogueEventIntent.supported(intent,item))return null;
+  if(!CatalogueEventIntent.supported(intent,item)||!CatalogueSeasonIntent.supported(intent,item))return null;
   var full=evaluate(intent,item,dayCount);
   if(intent.raw().isBlank())return full;
   boolean meaningful=intent.spans().stream().anyMatch(s->s.kind().equals("geography"))
@@ -38,7 +38,7 @@ final class PlanSearchEligibility {
   return false;
  }
  static PlanSearchQuery.Match evaluate(SearchIntent intent,PublicSearchEvidence item,int dayCount){
-  if(intent.blocked()||intent.days()!=null&&intent.days()!=dayCount)return null;
+  if(intent.blocked()||intent.days()!=null&&intent.days()!=dayCount||!CatalogueSeasonIntent.supported(intent,item))return null;
   var geo=intent.geography();
   java.util.function.Predicate<PlanSearchQuery.Location> geoMatch=g->(g.country().isBlank()||item.countries().contains(g.country()))&&(g.countryLevel()||java.util.regex.Pattern.compile("(?<![\\p{L}\\p{N}])"+String.join("\\s*",Arrays.stream(TravelConcepts.normal(g.name()).split(" ")).map(java.util.regex.Pattern::quote).toList())+"(?![\\p{L}\\p{N}])").matcher(item.text()).find());
   if(intent.geographicGroups().stream().anyMatch(group->group.stream().noneMatch(geoMatch)))return null;

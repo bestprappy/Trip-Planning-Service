@@ -18,15 +18,19 @@ final class PublicSearchEvidenceBuilder {
   var countries=new HashSet<String>();String primary=countryCode.apply(plan.destinationCountry());if(!primary.isEmpty())countries.add(primary);
   var text=new StringBuilder(affirmative(plan.title())).append(' ').append(Objects.toString(plan.destinationCity(),"")).append(' ').append(Objects.toString(plan.destinationCountry(),""));
   var events=new StringBuilder(affirmative(plan.title()));var strongText=new StringBuilder(text);var strong=new HashSet<>(TravelConcepts.extract(affirmative(plan.title())));var weak=new HashSet<String>();var scheduled=new HashSet<String>();
-  if(plan.startingPart()!=null&&(plan.included()==null||plan.included().includeStartingPart())){String intro=affirmative(plan.startingPart().content());text.append(' ').append(intro);strongText.append(' ').append(intro);events.append(' ').append(intro);strong.addAll(TravelConcepts.extract(intro));}
+  var seasons=new StringBuilder(affirmative(plan.title()));
+  if(plan.startingPart()!=null&&(plan.included()==null||plan.included().includeStartingPart())){String intro=affirmative(plan.startingPart().content());text.append(' ').append(intro);strongText.append(' ').append(intro);events.append(' ').append(intro);seasons.append(' ').append(intro);strong.addAll(TravelConcepts.extract(intro));}
   int count=0,nature=0;
   for(boolean itinerary:List.of(true,false))for(var day:itinerary?safe(plan.days()):safe(plan.lists()))if(day!=null){
    String heading=affirmative(day.title());text.append(' ').append(heading);if(itinerary)events.append(' ').append(heading);
+   seasons.append(' ').append(heading);
    for(var item:safe(day.items()))if(item!=null){
     boolean place=Set.of("place","charger").contains(Objects.toString(item.type(),""));
     boolean notesVisible=plan.included()==null||plan.included().includeNotes();
     String owner=notesVisible?affirmative(String.join(" ",Objects.toString(item.notes(),""),Objects.toString(item.noteContent(),""))):"";
     String checklist=notesVisible?affirmative(String.join(" ",safe(item.checklistLabels()))):"";
+    // Geographic and venue names do not establish seasonal suitability. Keep affirmative published explanations only.
+    seasons.append(' ').append(owner).append(' ').append(checklist).append(' ').append(affirmative(item.description()));
     String placeText=place?String.join(" ",Objects.toString(item.name(),""),Objects.toString(item.placeType(),"").replace('_',' '),Objects.toString(item.description(),"")):"";
     String detail=String.join(" ",placeText,owner,checklist,Objects.toString(item.city(),""),Objects.toString(item.address(),""));text.append(' ').append(detail);
     Set<String> concepts=TravelConcepts.extract(placeText+" "+owner);
@@ -41,6 +45,6 @@ final class PublicSearchEvidenceBuilder {
   }
   if(countries.contains("US")&&TravelConcepts.has(TravelConcepts.normal(text.toString()),"ca"))text.append(" California");
   var dates=new ArrayList<MonthDay>();if(plan.included()!=null&&plan.included().includeDates()){if(plan.startDate()!=null)dates.add(plan.startDate());safe(plan.days()).stream().filter(Objects::nonNull).map(PublicDayDto::date).filter(Objects::nonNull).forEach(dates::add);}
-  return new PublicSearchEvidence(plan.title(),TravelConcepts.normal(text.toString()),TravelConcepts.normal(strongText.toString()),TravelConcepts.normal(events.toString()),Set.copyOf(countries),Set.copyOf(strong),Set.copyOf(weak),Set.copyOf(scheduled),List.copyOf(dates),count,nature);
+  return new PublicSearchEvidence(plan.title(),TravelConcepts.normal(text.toString()),TravelConcepts.normal(strongText.toString()),TravelConcepts.normal(events.toString()),TravelConcepts.normal(seasons.toString()),Set.copyOf(countries),Set.copyOf(strong),Set.copyOf(weak),Set.copyOf(scheduled),List.copyOf(dates),count,nature);
  }
 }

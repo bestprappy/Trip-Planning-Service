@@ -90,12 +90,8 @@ class SearchFilterAuditTests extends SearchTestFixtures {
    RESPONSES.put(q.text()+"|"+country+"|"+Objects.toString(days,"")+"|relevance||",r);
    check(r,q.text(),country,days,"relevance","","");
    var ids=Stream.concat(r.matching().stream(),r.related().stream()).map(p->p.token()).toList();
-   boolean season=q.text().toLowerCase(Locale.ROOT).matches(".*\\b(?:winter|summer|spring|autumn)\\b.*");
-   // The existing approved parser explicitly blocks unverified seasonal conditions.
-   // Record this as a capability gap, not a passed seasonal-retrieval assertion.
-   if(season){assertThat(r.searchAssist().blocked()).isTrue();assertThat(ids).isEmpty();}
-   else if(!q.expectedToken().isBlank()&&(days==null||byId.get(q.expectedToken()).days()==days))assertThat(ids).as("Known supported query retrieves independently specified fixture").contains(q.expectedToken());
-   REPORT.add(audit(r,q.text(),country,days,"relevance","","",season?"CAPABILITY GAP: season words are explicitly blocked; use a month. No seasonal retrieval success claimed.":ids.isEmpty()?"No results: inspect wording or lack of qualifying evidence":"Retrieved qualified test publications"));
+   if(!q.expectedToken().isBlank()&&(days==null||byId.get(q.expectedToken()).days()==days))assertThat(ids).as("Known supported query retrieves independently specified fixture").contains(q.expectedToken());
+   REPORT.add(audit(r,q.text(),country,days,"relevance","","",ids.isEmpty()?"No results: inspect wording or lack of qualifying evidence":"Retrieved qualified test publications"));
   })));
  }
  void check(SharedPlanSearchService.SearchPage r,String query,String country,Integer days,String sort,String collections,String themes){

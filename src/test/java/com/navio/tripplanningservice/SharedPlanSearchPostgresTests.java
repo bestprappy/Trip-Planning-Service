@@ -16,6 +16,23 @@ class SharedPlanSearchPostgresTests {
  @Autowired EntityManager em;
  @Autowired ExploreSearchRepository repository;
  @Autowired javax.sql.DataSource dataSource;
+ @Test void seasonalKeywordsRespectStoredPublicationEvidenceAndFilters(){
+  String[] titles={"Kyoto Spring gardens","Kyoto Autumn gardens","Kyoto gardens","Bangkok Spring gardens"};
+  for(int i=0;i<titles.length;i++){
+   UUID trip=UUID.randomUUID();em.createNativeQuery("INSERT INTO trip.trip(id,user_id,start_date,end_date,destination_id,destination_name) VALUES(:id,:owner,CURRENT_DATE,CURRENT_DATE,'test','Test')")
+    .setParameter("id",trip).setParameter("owner",UUID.randomUUID()).executeUpdate();
+   String snapshot="{\"sanitizerVersion\":"+PlanPublicationSanitizer.SANITIZER_VERSION+",\"title\":\""+titles[i]+"\",\"destinationCity\":\""+(i==3?"Bangkok":"Kyoto")+"\",\"destinationCountry\":\""+(i==3?"Thailand":"Japan")+"\",\"dayCount\":3,\"days\":[]}";
+   em.createNativeQuery("INSERT INTO trip.trip_publication(id,trip_id,token,snapshot,sanitizer_version,source_trip_version,listed_in_explore,listed_at,status) VALUES(:id,:trip,:token,CAST(:snapshot AS jsonb),:version,0,true,:at,'ACTIVE')")
+    .setParameter("id",UUID.randomUUID()).setParameter("trip",trip).setParameter("token","season-test-"+i).setParameter("snapshot",snapshot)
+    .setParameter("version",PlanPublicationSanitizer.SANITIZER_VERSION).setParameter("at",java.time.Instant.now()).executeUpdate();
+  }
+  var search=new com.navio.tripplanningservice.service.publication.SharedPlanSearchService(repository,new com.fasterxml.jackson.databind.ObjectMapper().findAndRegisterModules(),new com.navio.tripplanningservice.service.publication.ExplorePlanSummarizer(),new com.navio.tripplanningservice.repository.SharedPlanCopyRepository(org.springframework.jdbc.core.simple.JdbcClient.create(dataSource)));
+  var result=search.search("Kyoto Spring","JP",3,0,12,"relevance");
+  assertThat(result.matching()).extracting(p->p.token()).containsExactly("season-test-0");
+  assertThat(result.related()).isEmpty();assertThat(result.searchAssist().blocked()).isFalse();
+  assertThat(search.search("Kyoto Spring","JP",2,0,12,"relevance").matching()).isEmpty();
+  assertThat(search.search("Kyoto Winter","JP",3,0,12,"relevance").related()).isEmpty();
+ }
  @Test void databaseStreamIncludesOnlyCurrentListedActivePublications(){
   UUID owner=UUID.randomUUID();for(int i=0;i<4;i++){
    UUID trip=UUID.randomUUID();em.createNativeQuery("INSERT INTO trip.trip(id,user_id,start_date,end_date,destination_id,destination_name) VALUES(:id,:owner,CURRENT_DATE,CURRENT_DATE,'test','Test')").setParameter("id",trip).setParameter("owner",owner).executeUpdate();

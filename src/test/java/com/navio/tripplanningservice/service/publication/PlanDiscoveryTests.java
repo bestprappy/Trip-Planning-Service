@@ -7,7 +7,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class PlanDiscoveryTests {
     private PublicSearchEvidence evidence(String text, Set<String> themes, MonthDay... dates) {
-        return new PublicSearchEvidence(text,text,text,text,Set.of("TH"),themes,Set.of(),themes,List.of(dates),2,1);
+        return new PublicSearchEvidence(text,text,text,text,text,Set.of("TH"),themes,Set.of(),themes,List.of(dates),2,1);
     }
     @Test void seasonalIsCalendarEvidenceNotClimateOrHiddenDates() {
         var now=LocalDate.of(2026,11,5);

@@ -120,11 +120,11 @@ final class SmartPlanSearchEngine {
         ||intent.terms().stream().anyMatch(t->mention.text().startsWith(t));
     if(requested&&!destination.isBlank()){hasCompletion=true;completions.add(destination+" "+TravelConcepts.label(mention.id()));}
    }
-   if((!hasCompletion||CatalogueEventIntent.constrained(intent))&&completions.size()<4&&!evidence.title().isBlank())completions.add(destination.isBlank()||normal(evidence.title()).contains(normal(destination))?evidence.title():destination+" "+evidence.title());
+   if((!hasCompletion||CatalogueEventIntent.constrained(intent)||CatalogueSeasonIntent.constrained(intent))&&completions.size()<4&&!evidence.title().isBlank())completions.add(destination.isBlank()||normal(evidence.title()).contains(normal(destination))?evidence.title():destination+" "+evidence.title());
   });
   var querySuggestions=completions.stream().filter(s->!normal(s).equals(query)).filter(s->{
    var candidate=SearchIntentParser.parse(s,locations.values(),selected,days);
-   return CatalogueEventIntent.preserved(intent,candidate);
+   return !candidate.blocked()&&CatalogueEventIntent.preserved(intent,candidate)&&CatalogueSeasonIntent.preserved(intent,candidate);
   }).limit(6).map(s->new QuerySuggestion(s,"catalogue")).toList();
   String correction=PlanSearchQuery.parse(term,locations.values(),country).correction;
   boolean strongLast=(long)(page+1)*size>=matching.size(),weakLast=(long)(page+1)*size>=relevant.size();
